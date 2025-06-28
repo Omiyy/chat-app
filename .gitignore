@@ -1,0 +1,17 @@
+# Ignore node_modules
+node_modules/
+.env
+.DS_Store
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Build files
+client/build/
+dist/
+
+# Ignore environment files
+server/.env
+client/.env
