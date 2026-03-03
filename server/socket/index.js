@@ -11,7 +11,7 @@ const app = express()
 // ✅ Add CORS middleware to Express
 const cors = require('cors')
 app.use(cors({
-    origin: "https://chat-app-mu-ten-76.vercel.app",
+    origin: "https://chat-app-mu-ten-76.vercel.app" ||  process.env.FRONTEND_URL,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE"]
 }))
@@ -20,7 +20,7 @@ app.use(cors({
 const server = http.createServer(app)
 const io = new Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || "http://localhost:5173",
+        origin: "https://chat-app-mu-ten-76.vercel.app" ||  process.env.FRONTEND_URL,
         credentials: true,
         methods: ["GET", "POST"]
     }
