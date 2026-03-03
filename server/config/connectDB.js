@@ -16,14 +16,12 @@ async function connectDB() {
       console.error("MongoDB error:", err);
     });
   } catch (error) {
-    console.log("MongoDB connection failed:", error.message);
-    console.log("Please check:");
-    console.log("1. Your IP address is whitelisted in MongoDB Atlas");
-    console.log("2. Your MongoDB connection string is correct");
-    console.log("3. Your network connection is stable");
-    
-    // Don't exit the process, let the server run without DB for now
-    console.log("Server will continue without database connection...");
+    console.error("❌ MongoDB connection failed:", error.message)
+    console.error("Please check:")
+    console.error("  1. Your IP address is whitelisted in MongoDB Atlas")
+    console.error("  2. Your MONGODB_URI in server/.env is correct")
+    console.error("  3. Your network/internet connection is stable")
+    process.exit(1) // Stop the server — app cannot work without a database
   }
 }
 

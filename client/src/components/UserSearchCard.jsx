@@ -4,22 +4,24 @@ import { Link } from 'react-router-dom'
 
 const UserSearchCard = ({user, onClose}) => {
   return (
-    <Link to={"/"+user?._id} onClick={onClose} className='flex items-center gap-3 p-2 lg:p-4 border border-transparent border-b-slate-200 hover:border hover:border-primary rounded cursor-pointer'>
-        <div>
-            <Avatar
-                width={50}
-                height={50}
-                name={user?.name}
-                userId={user?._id}
-                imageUrl={user?.profile_pic}
-            />
-        </div>
-        <div>
-            <div className='font-semibold text-ellipsis line-clamp-1'>
-                {user?.name}
-            </div>
-            <p className='text-sm text-ellipsis line-clamp-1'>{user?.email}</p>
-        </div>
+    <Link
+      to={"/home/" + user?._id}
+      onClick={onClose}
+      style={{display:'flex', alignItems:'center', gap:12, padding:'10px 12px', borderRadius:12, textDecoration:'none', transition:'background 0.15s', cursor:'pointer'}}
+      onMouseEnter={e => e.currentTarget.style.background='rgba(124,106,247,0.08)'}
+      onMouseLeave={e => e.currentTarget.style.background='transparent'}
+    >
+      <Avatar
+        width={44}
+        height={44}
+        name={user?.name}
+        userId={user?._id}
+        imageUrl={user?.profile_pic}
+      />
+      <div className='flex-1 min-w-0'>
+        <p className='font-syne font-bold text-sm truncate' style={{color:'#f0eeff'}}>{user?.name}</p>
+        <p className='text-xs truncate' style={{color:'#5c587a'}}>{user?.email}</p>
+      </div>
     </Link>
   )
 }

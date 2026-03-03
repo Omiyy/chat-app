@@ -1,15 +1,71 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #f8fafc;
+/* ─── Design tokens ─────────────────────────────────────────── */
+@theme {
+  --color-primary:       #7c6af7;
+  --color-primary-light: #a594f9;
+  --color-surface:       #111118;
+  --color-bg:            #0a0a0f;
+  --color-border:        #1e1e28;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;}
+/* ─── Base ───────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #0a0a0f;
+  color: #f0eeff;
+}
+
+/* ─── Scrollbars ─────────────────────────────────────────────── */
+::-webkit-scrollbar            { width: 3px; height: 3px; }
+::-webkit-scrollbar-track      { background: transparent; }
+::-webkit-scrollbar-thumb      { background: #2a2a35; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover{ background: #7c6af7; }
+
+.sidebar-scroll::-webkit-scrollbar,
+.messages-scroll::-webkit-scrollbar      { width: 3px; }
+.sidebar-scroll::-webkit-scrollbar-thumb,
+.messages-scroll::-webkit-scrollbar-thumb{ background: #2a2a35; border-radius: 4px; }
+
+/* ─── Text selection ─────────────────────────────────────────── */
+::selection { background: rgba(124,106,247,0.35); color: #f0eeff; }
+
+/* ─── Autofill override ──────────────────────────────────────── */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #111118 inset;
+  -webkit-text-fill-color: #f0eeff;
+  transition: background-color 9999s;
+}
+
+/* ─── Button press ───────────────────────────────────────────── */
+button:active:not(:disabled) { transform: scale(0.96); }
+
+/* ─── Message bubble animation ───────────────────────────────── */
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.msg-bubble { animation: msgIn 0.16s ease-out both; }
+
+/* ─── Fade-slide in ──────────────────────────────────────────── */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-slide-in { animation: fadeSlideIn 0.2s ease-out both; }
+
+/* ─── Syne font for headings & labels ───────────────────────── */
+.font-syne { font-family: 'Syne', sans-serif; }

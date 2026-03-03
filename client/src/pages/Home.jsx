@@ -13,7 +13,6 @@ const Home = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
-  console.log('user',user)
   const fetchUserDetails = async()=>{
     try {
         const URL = `${import.meta.env.VITE_BACKEND_URL}/api/user-details`
@@ -28,9 +27,8 @@ const Home = () => {
             dispatch(logout())
             navigate("/email")
         }
-        console.log("current user Details",response)
     } catch (error) {
-        console.log("error",error)
+        console.error("fetchUserDetails error",error)
     }
   }
 
@@ -55,7 +53,6 @@ const Home = () => {
     })
 
     socketConnection.on('onlineUser',(data)=>{
-      console.log(data)
       dispatch(setOnlineUser(data))
     })
 
@@ -69,27 +66,44 @@ const Home = () => {
 
   const basePath = location.pathname === '/home'
   return (
-    <div className='grid lg:grid-cols-[300px,1fr] h-screen max-h-screen bg-gray-50'>
-        <section className={`bg-white shadow-md ${!basePath && "hidden"} lg:block`}>
+    <div className='flex h-screen max-h-screen overflow-hidden' style={{background:'#0a0a0f'}}>
+
+        {/* Sidebar — left vertical panel, hidden on mobile when chat is open */}
+        <aside className={`flex-shrink-0 w-[300px] md:w-[320px] h-full overflow-hidden ${!basePath ? 'hidden md:flex md:flex-col' : 'flex flex-col w-full md:w-[320px]'}`} style={{background:'#111118', borderRight:'1px solid #1e1e28'}}>
            <Sidebar/>
+        </aside>
+
+        {/* Right panel — fills remaining space */}
+        <section className={`flex-1 h-full overflow-hidden min-w-0 ${basePath ? 'hidden md:block' : 'block'}`}>
+            {basePath ? (
+                /* Empty state shown when no chat is selected */
+                <div className='flex h-full items-center justify-center flex-col gap-4 relative overflow-hidden' style={{background:'#0a0a0f'}}>
+                    <div className='absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full blur-3xl pointer-events-none' style={{background:'rgba(124,106,247,0.10)'}} />
+                    <div className='absolute bottom-1/4 right-1/4 w-64 h-64 rounded-full blur-2xl pointer-events-none' style={{background:'rgba(244,114,182,0.06)'}} />
+                    <div className='relative flex flex-col items-center gap-4'>
+                        <div className='w-20 h-20 rounded-2xl flex items-center justify-center rotate-3' style={{background:'linear-gradient(135deg, #7c6af7, #a594f9)', boxShadow:'0 8px 32px rgba(124,106,247,0.4)'}}>
+                            <img src={logo} width={44} alt='logo' className='-rotate-3' />
+                        </div>
+                        <div className='text-center'>
+                            <h2 className='text-2xl font-syne font-bold mb-2' style={{color:'#f0eeff', letterSpacing:'-0.5px'}}>Your messages</h2>
+                            <p className='text-sm max-w-xs leading-relaxed' style={{color:'#5c587a'}}>
+                                Select a conversation from the sidebar, or click
+                                <span className='mx-1 font-semibold' style={{color:'#a594f9'}}>+</span>
+                                to start a new chat
+                            </p>
+                        </div>
+                        <div className='flex items-center gap-2 mt-2'>
+                            <div className='w-2 h-2 rounded-full animate-bounce' style={{background:'rgba(124,106,247,0.5)', animationDelay:'0ms'}} />
+                            <div className='w-2 h-2 rounded-full animate-bounce' style={{background:'#7c6af7', animationDelay:'150ms'}} />
+                            <div className='w-2 h-2 rounded-full animate-bounce' style={{background:'rgba(124,106,247,0.5)', animationDelay:'300ms'}} />
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <Outlet/>
+            )}
         </section>
 
-        {/**message component**/}
-        <section className={`${basePath && "hidden"} bg-white`} >
-            <Outlet/>
-        </section>
-
-
-        <div className={`justify-center items-center flex-col gap-2 hidden ${!basePath ? "hidden" : "lg:flex" } bg-white`}>
-            <div>
-              <img
-                src={logo}
-                width={250}
-                alt='logo'
-              />
-            </div>
-            <p className='text-lg mt-2 text-slate-500'>Select user to send message</p>
-        </div>
     </div>
   )
 }
