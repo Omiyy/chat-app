@@ -32,6 +32,12 @@ io.on('connection',async(socket)=>{
     //current user details 
     const user = await getUserDetailsFromToken(token)
 
+    // disconnect if token invalid
+    if(!user || user.logout){
+        socket.disconnect()
+        return
+    }
+
     //create a room
     socket.join(user?._id.toString())
     onlineUser.add(user?._id?.toString())
