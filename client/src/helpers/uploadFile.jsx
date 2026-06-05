@@ -1,18 +1,41 @@
-const url = `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/auto/upload`
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime']
 
-const uploadFile = async(file)=>{
-    const formData = new FormData()
-    formData.append('file',file)
-    formData.append("upload_preset","chat-app-file")
+const uploadFile = async (file) => {
+  // Validate file size
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error(`File too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`)
+  }
 
-    const response = await fetch(url,{
-        method : 'post',
-        body : formData
-    })
-    const responseData = await response.json()
+  // Validate file type
+  const isImage = ALLOWED_IMAGE_TYPES.includes(file.type)
+  const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type)
+  if (!isImage && !isVideo) {
+    throw new Error('Unsupported file type. Please upload an image or video.')
+  }
 
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
+  if (!cloudName) {
+    throw new Error('Upload service is not configured.')
+  }
 
-    return responseData
+  const url = `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('upload_preset', 'chat-app-file')
+
+  const response = await fetch(url, {
+    method: 'post',
+    body: formData,
+  })
+
+  if (!response.ok) {
+    throw new Error('Upload failed. Please try again.')
+  }
+
+  const responseData = await response.json()
+  return responseData
 }
 
 export default uploadFile

@@ -1,11 +1,7 @@
 import React from 'react'
 
-const Divider = () => {
-  return (
-    <div className='p-[0.5px] bg-slate-200 my-1'>
-      
-    </div>
-  )
-}
+const Divider = () => (
+  <div className='h-px my-1' style={{ backgroundColor: 'var(--border-subtle)' }} />
+)
 
 export default Divider

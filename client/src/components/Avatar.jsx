@@ -24,50 +24,60 @@ const getColorIndex = (str) => {
   return Math.abs(hash) % bgColors.length
 }
 
-const Avatar = ({userId, name, imageUrl, width, height}) => {
-    const onlineUser = useSelector(state => state?.user?.onlineUser)
+const Avatar = ({ userId, name, imageUrl, width, height }) => {
+  const onlineUser = useSelector(state => state?.user?.onlineUser)
 
-    let avatarName = ""
-    if (name) {
-      const splitName = name.trim().split(" ")
-      avatarName = splitName.length > 1
-        ? (splitName[0][0] + splitName[1][0]).toUpperCase()
-        : splitName[0][0].toUpperCase()
-    }
+  let avatarName = ""
+  if (name) {
+    const splitName = name.trim().split(" ")
+    avatarName = splitName.length > 1
+      ? (splitName[0][0] + splitName[1][0]).toUpperCase()
+      : splitName[0][0].toUpperCase()
+  }
 
-    const colorClass = bgColors[getColorIndex(userId || name)]
-    const isOnline = onlineUser?.includes(userId)
-    const fontSize = width >= 50 ? '16px' : width >= 36 ? '13px' : '11px'
+  const colorClass = bgColors[getColorIndex(userId || name)]
+  const isOnline = onlineUser?.includes(userId)
+  const fontSize = width >= 50 ? '16px' : width >= 36 ? '13px' : '11px'
 
-    return (
+  return (
+    <div
+      className='rounded-full relative flex-shrink-0'
+      style={{ width: width + 'px', height: height + 'px' }}
+      role="img"
+      aria-label={name ? `${name}'s avatar${isOnline ? ' (online)' : ''}` : 'User avatar'}
+    >
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          width={width}
+          height={height}
+          alt={name || 'User avatar'}
+          className='rounded-full object-cover w-full h-full'
+          loading="lazy"
+        />
+      ) : name ? (
         <div
-            className='rounded-full relative flex-shrink-0'
-            style={{ width: width + 'px', height: height + 'px' }}
+          className={`rounded-full flex justify-center items-center font-semibold ${colorClass}`}
+          style={{ width: width + 'px', height: height + 'px', fontSize }}
         >
-            {imageUrl ? (
-                <img
-                    src={imageUrl}
-                    width={width}
-                    height={height}
-                    alt={name}
-                    className='rounded-full object-cover w-full h-full'
-                />
-            ) : name ? (
-                <div
-                    className={`rounded-full flex justify-center items-center font-bold ${colorClass}`}
-                    style={{ width: width + 'px', height: height + 'px', fontSize }}
-                >
-                    {avatarName}
-                </div>
-            ) : (
-                <PiUserCircle size={width} className='text-slate-400' />
-            )}
-
-            {isOnline && (
-                <div className='absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full'></div>
-            )}
+          {avatarName}
         </div>
-    )
+      ) : (
+        <PiUserCircle size={width} style={{ color: 'var(--text-tertiary)' }} />
+      )}
+
+      {isOnline && (
+        <div
+          className='absolute bottom-0 right-0 w-3 h-3 rounded-full'
+          style={{
+            backgroundColor: '#4ade80',
+            border: '2px solid var(--bg-secondary)',
+          }}
+          aria-hidden="true"
+        />
+      )}
+    </div>
+  )
 }
 
-export default Avatar
+export default React.memo(Avatar)

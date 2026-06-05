@@ -1,7 +1,7 @@
 import React from 'react'
 
 const Loading = ({ size = 24, className = '' }) => (
-  <div className={`flex items-center justify-center ${className}`}>
+  <div className={`flex items-center justify-center ${className}`} role="status" aria-label="Loading">
     <svg
       className='animate-spin'
       style={{ width: size, height: size }}
@@ -12,16 +12,17 @@ const Loading = ({ size = 24, className = '' }) => (
       <circle
         className='opacity-20'
         cx='12' cy='12' r='10'
-        stroke='#7c6af7'
+        stroke='var(--color-accent, #7c6af7)'
         strokeWidth='3'
       />
       <path
         d='M12 2a10 10 0 0 1 10 10'
-        stroke='#7c6af7'
+        stroke='var(--color-accent, #7c6af7)'
         strokeWidth='3'
         strokeLinecap='round'
       />
     </svg>
+    <span className="sr-only">Loading...</span>
   </div>
 )
 

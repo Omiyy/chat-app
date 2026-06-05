@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useSelector } from 'react-redux'
 import { Link, useParams } from 'react-router-dom'
 import Avatar from './Avatar'
@@ -10,11 +10,23 @@ import { MdOutlineEmojiEmotions, MdAttachFile } from "react-icons/md";
 import uploadFile from '../helpers/uploadFile';
 import { IoClose } from "react-icons/io5";
 import { IoMdSend } from "react-icons/io";
-import { BsCheck2All, BsMicFill } from "react-icons/bs";
+import { BsCheck2All } from "react-icons/bs";
 import Loading from './Loading';
+import toast from 'react-hot-toast';
 import moment from 'moment'
 
 const EMOJIS = ["😊","😂","❤️","🔥","👍","🎉","😮","😢","🤔","💯","✨","👀"]
+
+// Basic URL validation for media sources
+const isValidMediaUrl = (url) => {
+  if (!url) return false
+  try {
+    const parsed = new URL(url)
+    return ['http:', 'https:'].includes(parsed.protocol)
+  } catch {
+    return false
+  }
+}
 
 const MessagePage = () => {
   const params = useParams()
@@ -46,6 +58,14 @@ const MessagePage = () => {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  // Close emoji picker on Escape
+  useEffect(() => {
+    if (!showEmoji) return
+    const handler = (e) => { if (e.key === 'Escape') setShowEmoji(false) }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [showEmoji])
+
   useEffect(() => {
     if (socketConnection) {
       socketConnection.emit('message-page', params.userId)
@@ -55,27 +75,37 @@ const MessagePage = () => {
     }
   }, [socketConnection, params?.userId, user])
 
-  const handleUploadImage = async (e) => {
+  const handleUploadImage = useCallback(async (e) => {
     const file = e.target.files[0]
     if (!file) return
     setLoading(true)
-    const result = await uploadFile(file)
-    setLoading(false)
-    setOpenAttachMenu(false)
-    setMessage(p => ({ ...p, imageUrl: result.url }))
-  }
+    try {
+      const result = await uploadFile(file)
+      setMessage(p => ({ ...p, imageUrl: result.url }))
+    } catch (err) {
+      toast.error(err.message || 'Failed to upload image')
+    } finally {
+      setLoading(false)
+      setOpenAttachMenu(false)
+    }
+  }, [])
 
-  const handleUploadVideo = async (e) => {
+  const handleUploadVideo = useCallback(async (e) => {
     const file = e.target.files[0]
     if (!file) return
     setLoading(true)
-    const result = await uploadFile(file)
-    setLoading(false)
-    setOpenAttachMenu(false)
-    setMessage(p => ({ ...p, videoUrl: result.url }))
-  }
+    try {
+      const result = await uploadFile(file)
+      setMessage(p => ({ ...p, videoUrl: result.url }))
+    } catch (err) {
+      toast.error(err.message || 'Failed to upload video')
+    } finally {
+      setLoading(false)
+      setOpenAttachMenu(false)
+    }
+  }, [])
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = useCallback((e) => {
     e.preventDefault()
     if (!message.text.trim() && !message.imageUrl && !message.videoUrl) return
     if (socketConnection) {
@@ -90,14 +120,14 @@ const MessagePage = () => {
       setMessage({ text: '', imageUrl: '', videoUrl: '' })
       inputRef.current?.focus()
     }
-  }
+  }, [message, socketConnection, user?._id, params.userId])
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSendMessage(e)
     }
-  }
+  }, [handleSendMessage])
 
   const groupedMessages = allMessage.reduce((acc, msg, idx) => {
     const dateKey = moment(msg.createdAt).format('YYYY-MM-DD')
@@ -116,69 +146,79 @@ const MessagePage = () => {
     })
   }
 
-  const iconBtnStyle = { width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:8, border:'none', cursor:'pointer', color:'#5c587a', background:'transparent', transition:'background 0.15s, color 0.15s' }
+  const handleImageClick = useCallback((url) => {
+    if (isValidMediaUrl(url)) {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
+  }, [])
 
   return (
-    <div style={{display:'flex', flexDirection:'column', height:'100%', background:'#0a0a0f'}}>
+    <div className='flex flex-col h-full' style={{ background: 'var(--bg-primary)' }}>
 
-      {/* Header */}
-      <header style={{flexShrink:0, height:64, background:'#0a0a0f', borderBottom:'1px solid #1e1e28', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 20px', zIndex:10}}>
-        <div style={{display:'flex', alignItems:'center', gap:14}}>
+      {/* ── Header ──────────────────────────────────────── */}
+      <header
+        className='flex-shrink-0 h-16 flex items-center justify-between px-5 z-10'
+        style={{ background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-subtle)' }}
+      >
+        <div className='flex items-center gap-3'>
           <Link
             to='/home'
-            style={{width:32, height:32, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:8, color:'#5c587a', textDecoration:'none'}}
-            className='md:hidden'
+            className='btn-icon md:hidden'
+            aria-label='Back to conversations'
           >
             <FaAngleLeft size={18} />
           </Link>
-          <div style={{display:'flex', alignItems:'center', gap:12, cursor:'pointer'}}>
-            <Avatar width={40} height={40} imageUrl={dataUser?.profile_pic} name={dataUser?.name} userId={dataUser?._id} />
+          <div className='flex items-center gap-3'>
+            <Avatar width={38} height={38} imageUrl={dataUser?.profile_pic} name={dataUser?.name} userId={dataUser?._id} />
             <div>
-              <h3 style={{fontFamily:'Syne, sans-serif', fontWeight:700, fontSize:15, letterSpacing:'-0.3px', color:'#f0eeff', margin:0}}>{dataUser?.name || '...'}</h3>
-              <div style={{display:'flex', alignItems:'center', gap:5, fontSize:11.5, marginTop:1}}>
+              <h3 className='font-semibold text-[15px]' style={{ color: 'var(--text-primary)', letterSpacing: '-0.2px' }}>
+                {dataUser?.name || '...'}
+              </h3>
+              <div className='flex items-center gap-1.5 text-[11px] mt-0.5'>
                 {dataUser.online ? (
                   <>
-                    <span style={{width:6, height:6, borderRadius:'50%', background:'#4ade80', display:'inline-block', animation:'pulse 2s infinite'}}/>
-                    <span style={{color:'#4ade80'}}>Online</span>
+                    <span className='w-1.5 h-1.5 rounded-full inline-block animate-pulse-dot' style={{ background: '#4ade80' }} />
+                    <span style={{ color: '#4ade80' }}>Online</span>
                   </>
                 ) : (
-                  <span style={{color:'#5c587a'}}>Offline</span>
+                  <span style={{ color: 'var(--text-tertiary)' }}>Offline</span>
                 )}
               </div>
             </div>
           </div>
         </div>
-        <button style={iconBtnStyle} title='More options'
-          onMouseEnter={e => { e.currentTarget.style.background='#18181f'; e.currentTarget.style.color='#a594f9' }}
-          onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#5c587a' }}
-        >
-          <HiDotsVertical size={19} />
+        <button className='btn-icon' title='More options' aria-label='More options'>
+          <HiDotsVertical size={18} />
         </button>
       </header>
 
-      {/* Messages */}
+      {/* ── Messages ────────────────────────────────────── */}
       <section
-        className='messages-scroll'
-        style={{flex:1, overflowY:'auto', overflowX:'hidden', padding:'24px 28px', display:'flex', flexDirection:'column'}}
+        className='flex-1 overflow-y-auto overflow-x-hidden px-5 py-6 flex flex-col'
+        aria-label='Messages'
       >
         {allMessage.length === 0 && !loading && (
-          <div style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:12, opacity:0.7}}>
-            <Avatar width={56} height={56} name={dataUser?.name} userId={dataUser?._id} imageUrl={dataUser?.profile_pic} />
-            <p style={{fontSize:14, color:'#9994b8', fontFamily:'Syne, sans-serif', fontWeight:600, margin:0}}>Start the conversation</p>
-            <p style={{fontSize:12, color:'#5c587a', margin:0}}>Say hi to {dataUser?.name || 'your contact'} 👋</p>
+          <div className='flex flex-col items-center justify-center h-full gap-3 animate-fade-in'>
+            <Avatar width={52} height={52} name={dataUser?.name} userId={dataUser?._id} imageUrl={dataUser?.profile_pic} />
+            <p className='text-sm font-medium' style={{ color: 'var(--text-secondary)' }}>
+              Start the conversation
+            </p>
+            <p className='text-[12px]' style={{ color: 'var(--text-tertiary)' }}>
+              Say hi to {dataUser?.name || 'your contact'} 👋
+            </p>
           </div>
         )}
 
-        <div style={{display:'flex', flexDirection:'column', gap:3, maxWidth:680, margin:'0 auto', width:'100%'}}>
+        <div className='flex flex-col gap-0.5 max-w-[680px] mx-auto w-full'>
           {groupedMessages.map((item) => {
             if (item.type === 'date') {
               return (
-                <div key={item.key} style={{display:'flex', alignItems:'center', gap:12, margin:'16px 0'}}>
-                  <div style={{flex:1, height:1, background:'#1e1e28'}}/>
-                  <span style={{fontSize:10.5, color:'#5c587a', fontWeight:600, letterSpacing:'0.06em', textTransform:'uppercase', fontFamily:'Syne, sans-serif', whiteSpace:'nowrap'}}>
+                <div key={item.key} className='flex items-center gap-4 my-5'>
+                  <div className='flex-1 h-px' style={{ background: 'var(--border-subtle)' }} />
+                  <span className='text-[10px] font-semibold tracking-wider uppercase whitespace-nowrap' style={{ color: 'var(--text-tertiary)' }}>
                     {formatDate(item.date)}
                   </span>
-                  <div style={{flex:1, height:1, background:'#1e1e28'}}/>
+                  <div className='flex-1 h-px' style={{ background: 'var(--border-subtle)' }} />
                 </div>
               )
             }
@@ -190,46 +230,75 @@ const MessagePage = () => {
             return (
               <div
                 key={item._id || item.key}
-                className='msg-bubble'
-                style={{display:'flex', alignItems:'flex-end', gap:9, justifyContent: isMine ? 'flex-end' : 'flex-start', marginBottom: consec ? 3 : 14}}
+                className='msg-bubble flex items-end gap-2'
+                style={{
+                  justifyContent: isMine ? 'flex-end' : 'flex-start',
+                  marginBottom: consec ? 2 : 12,
+                }}
               >
+                {/* Their avatar */}
                 {!isMine && (
-                  <div style={{flexShrink:0, opacity: consec ? 0 : 1, transition:'opacity 0.15s'}}>
-                    <Avatar width={30} height={30} imageUrl={dataUser?.profile_pic} name={dataUser?.name} userId={dataUser?._id} />
+                  <div className='flex-shrink-0' style={{ opacity: consec ? 0 : 1, transition: 'opacity 0.15s' }}>
+                    <Avatar width={28} height={28} imageUrl={dataUser?.profile_pic} name={dataUser?.name} userId={dataUser?._id} />
                   </div>
                 )}
 
-                <div style={{maxWidth:'62%', position:'relative', display:'flex', flexDirection:'column', alignItems: isMine ? 'flex-end' : 'flex-start'}}>
-                  <div style={{
-                    padding:'10px 14px',
-                    borderRadius:18,
-                    background: isMine ? 'linear-gradient(135deg, #7c6af7dd, #7c6af799)' : '#18181f',
-                    borderBottomRightRadius: isMine ? (consec ? 18 : 5) : 18,
-                    borderBottomLeftRadius: !isMine ? (consec ? 18 : 5) : 18,
-                    boxShadow: isMine ? '0 4px 20px rgba(124,106,247,0.35)' : 'none',
-                  }}>
-                    {item?.imageUrl && (
-                      <img src={item.imageUrl} alt='img' style={{borderRadius:10, maxWidth:'100%', maxHeight:220, objectFit:'cover', display:'block', marginBottom: item.text ? 8 : 0, cursor:'pointer'}}
-                        onClick={() => window.open(item.imageUrl, '_blank')} />
+                <div className='max-w-[65%] relative flex flex-col' style={{ alignItems: isMine ? 'flex-end' : 'flex-start' }}>
+                  <div
+                    className='px-3.5 py-2.5'
+                    style={{
+                      borderRadius: 16,
+                      background: isMine ? 'var(--msg-own-bg)' : 'var(--msg-their-bg)',
+                      borderBottomRightRadius: isMine ? (consec ? 16 : 4) : 16,
+                      borderBottomLeftRadius: !isMine ? (consec ? 16 : 4) : 16,
+                    }}
+                  >
+                    {/* Image */}
+                    {item?.imageUrl && isValidMediaUrl(item.imageUrl) && (
+                      <img
+                        src={item.imageUrl}
+                        alt='Shared image'
+                        className='rounded-lg max-w-full object-cover block cursor-pointer'
+                        style={{ maxHeight: 220, marginBottom: item.text ? 8 : 0 }}
+                        onClick={() => handleImageClick(item.imageUrl)}
+                        loading="lazy"
+                      />
                     )}
-                    {item?.videoUrl && (
-                      <video src={item.videoUrl} style={{borderRadius:10, maxWidth:'100%', maxHeight:220, display:'block', marginBottom: item.text ? 8 : 0}} controls />
+                    {/* Video */}
+                    {item?.videoUrl && isValidMediaUrl(item.videoUrl) && (
+                      <video
+                        src={item.videoUrl}
+                        className='rounded-lg max-w-full block'
+                        style={{ maxHeight: 220, marginBottom: item.text ? 8 : 0 }}
+                        controls
+                      />
                     )}
+                    {/* Text */}
                     {item.text && (
-                      <p style={{fontSize:14, lineHeight:1.55, wordBreak:'break-word', color: isMine ? '#fff' : '#f0eeff', margin:0}}>{item.text}</p>
+                      <p
+                        className='text-[14px] leading-relaxed break-words m-0'
+                        style={{ color: isMine ? 'var(--msg-own-text)' : 'var(--msg-their-text)' }}
+                      >
+                        {item.text}
+                      </p>
                     )}
-                    <div style={{display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4, marginTop:5}}>
-                      <span style={{fontSize:10.5, color: isMine ? 'rgba(255,255,255,0.55)' : '#5c587a', whiteSpace:'nowrap'}}>
+                    {/* Timestamp */}
+                    <div className='flex items-center justify-end gap-1 mt-1'>
+                      <span
+                        className='text-[10px] whitespace-nowrap'
+                        style={{ color: isMine ? 'rgba(255,255,255,0.5)' : 'var(--text-tertiary)' }}
+                      >
                         {moment(item.createdAt).format('h:mm A')}
                       </span>
-                      {isMine && <BsCheck2All size={13} style={{color:'rgba(255,255,255,0.55)'}} />}
+                      {isMine && <BsCheck2All size={12} style={{ color: 'rgba(255,255,255,0.5)' }} />}
                     </div>
                   </div>
                 </div>
 
+                {/* My avatar */}
                 {isMine && (
-                  <div style={{flexShrink:0, opacity: consec ? 0 : 1, transition:'opacity 0.15s'}}>
-                    <Avatar width={30} height={30} imageUrl={user?.profile_pic} name={user?.name} userId={user?._id} />
+                  <div className='flex-shrink-0' style={{ opacity: consec ? 0 : 1, transition: 'opacity 0.15s' }}>
+                    <Avatar width={28} height={28} imageUrl={user?.profile_pic} name={user?.name} userId={user?._id} />
                   </div>
                 )}
               </div>
@@ -238,39 +307,78 @@ const MessagePage = () => {
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Upload indicator */}
         {loading && (
-          <div style={{position:'fixed', bottom:96, left:'50%', transform:'translateX(-50%)', zIndex:20, background:'#111118', border:'1px solid #2a2a35', borderRadius:12, padding:'10px 18px', display:'flex', alignItems:'center', gap:8, boxShadow:'0 8px 32px rgba(0,0,0,0.5)'}}>
-            <Loading />
-            <span style={{fontSize:12, color:'#9994b8'}}>Uploading...</span>
+          <div
+            className='fixed bottom-24 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-2.5 rounded-xl animate-fade-in-up'
+            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-primary)', boxShadow: 'var(--shadow-md)' }}
+          >
+            <Loading size={18} />
+            <span className='text-[12px]' style={{ color: 'var(--text-secondary)' }}>Uploading...</span>
           </div>
         )}
       </section>
 
-      {/* Media Preview */}
+      {/* ── Media Preview ───────────────────────────────── */}
       {(message.imageUrl || message.videoUrl) && (
-        <div style={{flexShrink:0, background:'#111118', borderTop:'1px solid #1e1e28', padding:'12px 20px'}}>
-          <div style={{display:'flex', alignItems:'center', gap:12, maxWidth:680, margin:'0 auto'}}>
-            <div style={{position:'relative', display:'inline-block'}}>
-              {message.imageUrl && <img src={message.imageUrl} alt='preview' style={{width:72, height:72, objectFit:'cover', borderRadius:10, border:'1px solid #2a2a35'}} />}
-              {message.videoUrl && <video src={message.videoUrl} style={{width:72, height:72, objectFit:'cover', borderRadius:10, border:'1px solid #2a2a35'}} />}
-              <button onClick={() => setMessage(p => ({ ...p, imageUrl:'', videoUrl:'' }))}
-                style={{position:'absolute', top:-6, right:-6, width:18, height:18, background:'#2a2a35', color:'#f0eeff', borderRadius:'50%', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center'}}>
+        <div className='flex-shrink-0 px-5 py-3' style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-subtle)' }}>
+          <div className='flex items-center gap-3 max-w-[680px] mx-auto'>
+            <div className='relative inline-block'>
+              {message.imageUrl && (
+                <img
+                  src={message.imageUrl}
+                  alt='Preview'
+                  className='w-16 h-16 object-cover rounded-lg'
+                  style={{ border: '1px solid var(--border-primary)' }}
+                />
+              )}
+              {message.videoUrl && (
+                <video
+                  src={message.videoUrl}
+                  className='w-16 h-16 object-cover rounded-lg'
+                  style={{ border: '1px solid var(--border-primary)' }}
+                />
+              )}
+              <button
+                onClick={() => setMessage(p => ({ ...p, imageUrl: '', videoUrl: '' }))}
+                className='absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center border-none'
+                style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+                aria-label='Remove attachment'
+              >
                 <IoClose size={10} />
               </button>
             </div>
-            <p style={{fontSize:12, color:'#5c587a'}}>{message.imageUrl ? 'Image ready to send' : 'Video ready to send'}</p>
+            <p className='text-[12px]' style={{ color: 'var(--text-tertiary)' }}>
+              {message.imageUrl ? 'Image ready to send' : 'Video ready to send'}
+            </p>
           </div>
         </div>
       )}
 
-      {/* Input Bar */}
-      <div style={{flexShrink:0, padding:'14px 20px 18px', borderTop:'1px solid #1e1e28', position:'relative'}}>
+      {/* ── Input Bar ───────────────────────────────────── */}
+      <div className='flex-shrink-0 px-5 py-3.5 relative' style={{ borderTop: '1px solid var(--border-subtle)' }}>
         {/* Emoji Picker */}
         {showEmoji && (
-          <div style={{position:'absolute', bottom:'calc(100% - 6px)', left:20, background:'#111118', border:'1px solid #2a2a35', borderRadius:14, padding:'10px 12px', display:'flex', flexWrap:'wrap', gap:4, width:220, boxShadow:'0 8px 32px rgba(0,0,0,0.5)', zIndex:20}}>
+          <div
+            className='absolute left-5 animate-fade-in-up flex flex-wrap gap-1 p-3 rounded-xl z-20'
+            style={{
+              bottom: 'calc(100% - 4px)',
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-primary)',
+              width: 220,
+              boxShadow: 'var(--shadow-lg)',
+            }}
+            role="listbox"
+            aria-label="Emoji picker"
+          >
             {EMOJIS.map(em => (
-              <button key={em} onClick={() => { setMessage(p => ({...p, text: p.text + em})); setShowEmoji(false); inputRef.current?.focus() }}
-                style={{background:'none', border:'none', fontSize:22, cursor:'pointer', padding:4, borderRadius:8, lineHeight:1.2}}>
+              <button
+                key={em}
+                onClick={() => { setMessage(p => ({ ...p, text: p.text + em })); setShowEmoji(false); inputRef.current?.focus() }}
+                className='bg-transparent border-none text-[22px] p-1 rounded-lg leading-none hover:bg-[var(--bg-hover)]'
+                role="option"
+                aria-label={em}
+              >
                 {em}
               </button>
             ))}
@@ -278,58 +386,74 @@ const MessagePage = () => {
         )}
 
         <form onSubmit={handleSendMessage}>
-          <div style={{
-            display:'flex', alignItems:'center', gap:6,
-            background:'#111118',
-            border:`1.5px solid ${inputFocused ? '#7c6af7' : '#2a2a35'}`,
-            borderRadius:16, padding:'8px 8px 8px 12px',
-            transition:'border-color 0.2s, box-shadow 0.2s',
-            boxShadow: inputFocused ? '0 0 0 3px rgba(124,106,247,0.2)' : 'none',
-            maxWidth:680, margin:'0 auto',
-          }}>
+          <div
+            className='flex items-center gap-1.5 rounded-xl px-2 py-1.5 max-w-[680px] mx-auto'
+            style={{
+              background: 'var(--bg-secondary)',
+              border: `1.5px solid ${inputFocused ? 'var(--color-accent)' : 'var(--border-primary)'}`,
+              transition: 'border-color 0.2s, box-shadow 0.2s',
+              boxShadow: inputFocused ? '0 0 0 3px var(--ring-accent)' : 'none',
+            }}
+          >
             {/* Attach */}
-            <div ref={attachMenuRef} style={{position:'relative', flexShrink:0}}>
-              <button type='button' onClick={() => setOpenAttachMenu(p => !p)}
-                style={iconBtnStyle} title='Attach'
-                onMouseEnter={e => e.currentTarget.style.color='#a594f9'}
-                onMouseLeave={e => e.currentTarget.style.color='#5c587a'}
+            <div ref={attachMenuRef} className='relative flex-shrink-0'>
+              <button
+                type='button'
+                onClick={() => setOpenAttachMenu(p => !p)}
+                className='btn-icon'
+                title='Attach file'
+                aria-label='Attach file'
+                aria-expanded={openAttachMenu}
               >
-                <MdAttachFile size={20} />
+                <MdAttachFile size={19} />
               </button>
               {openAttachMenu && (
-                <div style={{position:'absolute', bottom:44, left:0, background:'#111118', border:'1px solid #2a2a35', borderRadius:16, overflow:'hidden', width:176, zIndex:30, boxShadow:'0 8px 32px rgba(0,0,0,0.5)'}}>
-                  <p style={{padding:'12px 16px 6px', fontSize:10, fontFamily:'Syne, sans-serif', fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase', color:'#5c587a'}}>Attach</p>
-                  <label htmlFor='uploadImage' style={{display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', fontSize:13, color:'#9994b8', transition:'background 0.15s'}}
-                    onMouseEnter={e => e.currentTarget.style.background='rgba(124,106,247,0.08)'}
-                    onMouseLeave={e => e.currentTarget.style.background='transparent'}
+                <div
+                  className='dropdown-menu bottom-11 left-0 w-44'
+                  role="menu"
+                  aria-label="Attachment options"
+                >
+                  <p className='px-4 pt-3 pb-1.5 text-[10px] font-semibold tracking-wider uppercase' style={{ color: 'var(--text-tertiary)' }}>
+                    Attach
+                  </p>
+                  <label
+                    htmlFor='uploadImage'
+                    className='dropdown-item cursor-pointer'
+                    role="menuitem"
                   >
-                    <div style={{width:32, height:32, borderRadius:'50%', background:'rgba(124,106,247,0.15)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
-                      <FaImage size={14} style={{color:'#a594f9'}} />
+                    <div className='w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0' style={{ background: 'var(--color-accent-soft)' }}>
+                      <FaImage size={13} style={{ color: 'var(--color-accent)' }} />
                     </div>
                     Image
                   </label>
-                  <label htmlFor='uploadVideo' style={{display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', fontSize:13, color:'#9994b8', borderTop:'1px solid #1e1e28', transition:'background 0.15s'}}
-                    onMouseEnter={e => e.currentTarget.style.background='rgba(124,106,247,0.08)'}
-                    onMouseLeave={e => e.currentTarget.style.background='transparent'}
+                  <label
+                    htmlFor='uploadVideo'
+                    className='dropdown-item cursor-pointer'
+                    role="menuitem"
+                    style={{ borderTop: '1px solid var(--border-subtle)' }}
                   >
-                    <div style={{width:32, height:32, borderRadius:'50%', background:'rgba(124,106,247,0.15)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
-                      <FaVideo size={14} style={{color:'#a594f9'}} />
+                    <div className='w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0' style={{ background: 'var(--color-accent-soft)' }}>
+                      <FaVideo size={13} style={{ color: 'var(--color-accent)' }} />
                     </div>
                     Video
                   </label>
-                  <input type='file' id='uploadImage' onChange={handleUploadImage} className='hidden' accept='image/*' />
-                  <input type='file' id='uploadVideo' onChange={handleUploadVideo} className='hidden' accept='video/*' />
+                  <input type='file' id='uploadImage' onChange={handleUploadImage} className='hidden' accept='image/jpeg,image/png,image/gif,image/webp' />
+                  <input type='file' id='uploadVideo' onChange={handleUploadVideo} className='hidden' accept='video/mp4,video/webm,video/ogg' />
                 </div>
               )}
             </div>
 
             {/* Emoji */}
-            <button type='button' onClick={() => setShowEmoji(s => !s)}
-              style={{...iconBtnStyle, color: showEmoji ? '#a594f9' : '#5c587a'}} title='Emoji'
-              onMouseEnter={e => e.currentTarget.style.color='#a594f9'}
-              onMouseLeave={e => { if (!showEmoji) e.currentTarget.style.color='#5c587a' }}
+            <button
+              type='button'
+              onClick={() => setShowEmoji(s => !s)}
+              className='btn-icon'
+              style={{ color: showEmoji ? 'var(--color-accent)' : undefined }}
+              title='Emoji'
+              aria-label='Open emoji picker'
+              aria-expanded={showEmoji}
             >
-              <MdOutlineEmojiEmotions size={21} />
+              <MdOutlineEmojiEmotions size={20} />
             </button>
 
             {/* Input */}
@@ -337,28 +461,32 @@ const MessagePage = () => {
               ref={inputRef}
               type='text'
               placeholder='Type a message…'
-              style={{flex:1, background:'none', border:'none', outline:'none', color:'#f0eeff', fontSize:14, fontFamily:'DM Sans, sans-serif', lineHeight:1.5, padding:'2px 0'}}
+              className='flex-1 bg-transparent border-none outline-none text-[14px] leading-normal py-0.5'
+              style={{ color: 'var(--text-primary)', fontFamily: 'Inter, sans-serif' }}
               value={message.text}
               onChange={e => setMessage(p => ({ ...p, text: e.target.value }))}
               onKeyDown={handleKeyDown}
               onFocus={() => setInputFocused(true)}
               onBlur={() => setInputFocused(false)}
               autoComplete='off'
+              aria-label='Message input'
             />
 
-            {/* Send / Mic */}
-            {(message.text.trim() || message.imageUrl || message.videoUrl) ? (
-              <button type='submit'
-                style={{width:38, height:38, borderRadius:12, background:'linear-gradient(135deg, #7c6af7, #a594f9)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:'0 4px 16px rgba(124,106,247,0.4)'}}
+            {/* Send */}
+            {(message.text.trim() || message.imageUrl || message.videoUrl) && (
+              <button
+                type='submit'
+                className='flex items-center justify-center flex-shrink-0 border-none'
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: 'var(--color-accent)',
+                  transition: 'background 0.15s',
+                }}
+                aria-label='Send message'
               >
-                <IoMdSend size={17} style={{color:'#fff', transform:'translateX(1px)'}} />
-              </button>
-            ) : (
-              <button type='button' style={iconBtnStyle} title='Voice message'
-                onMouseEnter={e => e.currentTarget.style.color='#a594f9'}
-                onMouseLeave={e => e.currentTarget.style.color='#5c587a'}
-              >
-                <BsMicFill size={16} />
+                <IoMdSend size={16} style={{ color: '#fff', transform: 'translateX(1px)' }} />
               </button>
             )}
           </div>

@@ -10,12 +10,13 @@ function App() {
         toastOptions={{
           duration: 3000,
           style: {
-            background: '#111118',
-            color: '#f0eeff',
+            background: 'var(--bg-elevated)',
+            color: 'var(--text-primary)',
             fontSize: '13px',
-            borderRadius: '12px',
+            borderRadius: '10px',
             padding: '10px 16px',
-            border: '1px solid #2a2a35',
+            border: '1px solid var(--border-primary)',
+            boxShadow: 'var(--shadow-md)',
           },
           success: { iconTheme: { primary: '#7c6af7', secondary: '#fff' } },
           error:   { iconTheme: { primary: '#f87171', secondary: '#fff' } },
