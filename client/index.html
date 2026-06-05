@@ -2,19 +2,52 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="ChatApp — A modern real-time messaging application. Send messages, share photos and videos, and stay connected." />
+
+    <!-- App Identity — helps Google recognize this as a legitimate app, not phishing -->
+    <title>ChatApp — Real-time Messaging</title>
+    <meta name="description" content="ChatApp is a real-time messaging application for private conversations. Send messages, share photos, videos, and stay connected with friends and colleagues." />
+    <meta name="application-name" content="ChatApp" />
+    <meta name="author" content="ChatApp Team" />
     <meta name="theme-color" content="#1a1a2e" />
+
+    <!-- Favicon & Web App Manifest -->
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ChatApp" />
+
+    <!-- Security headers (defense-in-depth alongside Vercel headers) -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     <meta http-equiv="X-Frame-Options" content="DENY" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
+
+    <!-- Open Graph — proves site identity to crawlers -->
+    <meta property="og:title" content="ChatApp — Real-time Messaging" />
+    <meta property="og:description" content="A modern real-time messaging app. Send messages, share photos and videos, and stay connected." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="ChatApp" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <title>ChatApp — Real-time Messaging</title>
+
+    <!-- Google Search Console verification — REPLACE with your actual verification tag -->
+    <!-- <meta name="google-site-verification" content="YOUR_VERIFICATION_CODE_HERE" /> -->
   </head>
   <body>
+    <!-- Noscript fallback — proves this is a real app -->
+    <noscript>
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;text-align:center;padding:24px;">
+        <div>
+          <h1>ChatApp</h1>
+          <p>JavaScript is required to use ChatApp. Please enable JavaScript in your browser settings.</p>
+        </div>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

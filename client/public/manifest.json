@@ -1,0 +1,16 @@
+{
+  "name": "ChatApp",
+  "short_name": "ChatApp",
+  "description": "A modern real-time messaging application",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0d1a",
+  "theme_color": "#7c6af7",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
