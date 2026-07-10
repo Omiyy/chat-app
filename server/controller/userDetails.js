@@ -1,9 +1,7 @@
-const getUserDetailsFromToken = require("../helpers/getUserDetailsFromToken")
-
 async function userDetails(req,res) {
     try {
-        const token  = req.cookies.token || ""
-        const user = await getUserDetailsFromToken(token)
+        // req.user is set by authMiddleware (already verified)
+        const user = req.user
 
         return res.status(200).json({
             message : "user details",

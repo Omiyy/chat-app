@@ -1,4 +1,4 @@
-import axios from 'axios'
+import api from '../helpers/axios'
 import React, { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -16,10 +16,7 @@ const Home = () => {
   const fetchUserDetails = async () => {
     try {
       const URL = `${import.meta.env.VITE_BACKEND_URL}/api/user-details`
-      const response = await axios({
-        url: URL,
-        withCredentials: true
-      })
+      const response = await api.get(URL)
 
       dispatch(setUser(response.data.data))
 

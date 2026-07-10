@@ -3,7 +3,7 @@ import { IoSearchOutline, IoClose } from "react-icons/io5";
 import Loading from './Loading';
 import UserSearchCard from './UserSearchCard';
 import toast from 'react-hot-toast'
-import axios from 'axios';
+import api from '../helpers/axios';
 
 const SearchUser = ({ onClose }) => {
   const [searchUser, setSearchUser] = useState([])
@@ -15,7 +15,7 @@ const SearchUser = ({ onClose }) => {
     const URL = `${import.meta.env.VITE_BACKEND_URL}/api/search-user`
     try {
       setLoading(true)
-      const response = await axios.post(URL, { search: query })
+      const response = await api.post(URL, { search: query })
       setLoading(false)
       setSearchUser(response.data.data)
     } catch (error) {

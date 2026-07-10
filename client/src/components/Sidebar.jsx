@@ -12,6 +12,7 @@ import EditUserDetails from './EditUserDetails';
 import SearchUser from './SearchUser';
 import { logout } from '../redux/userSlice';
 import moment from 'moment';
+import api from '../helpers/axios';
 
 const Sidebar = () => {
   const user = useSelector(state => state?.user)
@@ -66,10 +67,15 @@ const Sidebar = () => {
     return () => document.removeEventListener('mousedown', handler)
   }, [showMenu])
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
+    try {
+      await api.get(`${import.meta.env.VITE_BACKEND_URL}/api/logout`)
+    } catch (error) {
+      console.error('Logout API error:', error)
+    }
     dispatch(logout())
+    localStorage.removeItem('token')
     navigate("/email")
-    localStorage.clear()
   }, [dispatch, navigate])
 
   const filteredUsers = allUser.filter(conv =>

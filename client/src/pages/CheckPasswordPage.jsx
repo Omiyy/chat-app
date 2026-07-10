@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import axios from 'axios'
+import api from '../helpers/axios'
 import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
 import { useDispatch } from 'react-redux';
@@ -31,10 +31,9 @@ const CheckPasswordPage = () => {
     setIsLoading(true)
     const URL = `${import.meta.env.VITE_BACKEND_URL}/api/password`
     try {
-      const response = await axios({
-        method: 'post', url: URL,
-        data: { userId: location?.state?._id, password: data.password },
-        withCredentials: true,
+      const response = await api.post(URL, {
+        userId: location?.state?._id,
+        password: data.password,
       })
       toast.success(response.data.message)
       if (response.data.success) {

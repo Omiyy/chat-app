@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Avatar from './Avatar'
 import uploadFile from '../helpers/uploadFile'
-import axios from 'axios'
+import api from '../helpers/axios'
 import toast from 'react-hot-toast'
 import { useDispatch } from 'react-redux'
 import { setUser } from '../redux/userSlice'
@@ -52,12 +52,7 @@ const EditUserDetails = ({ onClose, user }) => {
     e.stopPropagation()
     try {
       const URL = `${import.meta.env.VITE_BACKEND_URL}/api/update-user`
-      const response = await axios({
-        method: 'post',
-        url: URL,
-        data: data,
-        withCredentials: true
-      })
+      const response = await api.post(URL, data)
       toast.success(response?.data?.message)
       if (response.data.success) {
         dispatch(setUser(response.data.data))
