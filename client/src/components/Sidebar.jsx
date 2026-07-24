@@ -11,14 +11,14 @@ import { useDispatch, useSelector } from 'react-redux';
 import EditUserDetails from './EditUserDetails';
 import SearchUser from './SearchUser';
 import GroupModal from './GroupModal';
-import { logout } from '../redux/userSlice';
+import { logout, setConversations } from '../redux/userSlice';
 import moment from 'moment';
 import api from '../helpers/axios';
 
 const Sidebar = () => {
   const user = useSelector(state => state?.user)
+  const allUser = useSelector(state => state?.user?.conversations) || []
   const [editUserOpen, setEditUserOpen] = useState(false)
-  const [allUser, setAllUser] = useState([])
   const [openSearchUser, setOpenSearchUser] = useState(false)
   const [openGroupModal, setOpenGroupModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -45,7 +45,7 @@ const Sidebar = () => {
             return { ...conversationUser, userDetails: conversationUser.sender }
           }
         })
-        setAllUser(conversationUserData)
+        dispatch(setConversations(conversationUserData))
       })
     }
   }, [socketConnection, user])

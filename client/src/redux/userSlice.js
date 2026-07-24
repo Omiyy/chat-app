@@ -8,7 +8,8 @@ const initialState = {
   token : "",
   onlineUser : [],
   socketConnection : null,
-  chatCache: {} // Cache for messages: { [userId]: messagesArray }
+  chatCache: {}, // Cache for messages: { [userId]: messagesArray }
+  conversations: [] // Cache for sidebar conversation list
 }
 
 export const userSlice = createSlice({
@@ -32,6 +33,7 @@ export const userSlice = createSlice({
         state.token = ""
         state.socketConnection = null
         state.chatCache = {}
+        state.conversations = []
     },
     setOnlineUser : (state,action)=>{
       state.onlineUser = action.payload
@@ -42,11 +44,22 @@ export const userSlice = createSlice({
     setChatCache: (state, action) => {
       const { chatId, messages } = action.payload
       state.chatCache[chatId] = messages
+    },
+    setConversations: (state, action) => {
+      state.conversations = action.payload
+    },
+    appendChatMessage: (state, action) => {
+      const { chatId, message } = action.payload
+      if (state.chatCache[chatId]) {
+        state.chatCache[chatId].push(message)
+      } else {
+        state.chatCache[chatId] = [message]
+      }
     }
   },
 })
 
 // Action creators are generated for each case reducer function
-export const { setUser, setToken ,logout, setOnlineUser,setSocketConnection, setChatCache } = userSlice.actions
+export const { setUser, setToken ,logout, setOnlineUser,setSocketConnection, setChatCache, setConversations, appendChatMessage } = userSlice.actions
 
 export default userSlice.reducer

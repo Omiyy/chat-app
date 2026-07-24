@@ -13,7 +13,7 @@ import { IoMdSend } from "react-icons/io";
 import { BsCheck2All } from "react-icons/bs";
 import Loading from './Loading';
 import toast from 'react-hot-toast';
-import { setChatCache } from '../redux/userSlice';
+import { setChatCache, appendChatMessage } from '../redux/userSlice';
 import moment from 'moment'
 
 const EMOJIS = ["😊","😂","❤️","🔥","👍","🎉","😮","😢","🤔","💯","✨","👀"]
@@ -41,16 +41,30 @@ const MessagePage = () => {
   const [loading, setLoading] = useState(false)
   const dispatch = useDispatch()
   const chatCache = useSelector(state => state?.user?.chatCache) || {}
+  const allConversations = useSelector(state => state?.user?.conversations) || []
   const [allMessage, setAllMessage] = useState(chatCache[params.userId] || [])
   const [inputFocused, setInputFocused] = useState(false)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const attachMenuRef = useRef(null)
 
-  // Instantly load cached messages when switching tabs
+  // Instantly load cached messages and header info when switching tabs
   useEffect(() => {
     setAllMessage(chatCache[params.userId] || [])
-  }, [params.userId])
+    
+    // Instantly set the header data from Redux conversations so we don't wait for socket!
+    const targetConv = allConversations.find(c => c._id === params.userId || c.userDetails?._id === params.userId)
+    if (targetConv) {
+      setDataUser(prev => ({
+        ...prev,
+        name: targetConv.isGroup ? targetConv.groupName : targetConv.userDetails?.name,
+        profile_pic: targetConv.isGroup ? '' : targetConv.userDetails?.profile_pic,
+        _id: targetConv.isGroup ? targetConv._id : targetConv.userDetails?._id,
+        isGroup: targetConv.isGroup,
+        participants: targetConv.participants
+      }))
+    }
+  }, [params.userId, allConversations])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -91,6 +105,14 @@ const MessagePage = () => {
           // Always update the Redux cache, even for background chats
           dispatch(setChatCache({ chatId: data.userId, messages: data.messages }))
         }
+      })
+      
+      socketConnection.on('new-message', (data) => {
+        // Incremental update for ultra-fast messaging!
+        if (data.userId === params.userId) {
+          setAllMessage(prev => [...prev, data.message])
+        }
+        dispatch(appendChatMessage({ chatId: data.userId, message: data.message }))
       })
     }
   }, [socketConnection, params?.userId, user, dispatch])

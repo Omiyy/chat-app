@@ -140,31 +140,27 @@ io.on('connection',async(socket)=>{
             "$push" : { messages : saveMessage?._id }
         })
 
-        if (conversation.isGroup) {
-            const getConversationMessage = await ConversationModel.findById(conversation._id).populate({ path: 'messages', populate: { path: 'msgByUserId', select: 'name profile_pic' } }).sort({ updatedAt : -1 })
-            
-            conversation.participants.forEach(async (participantId) => {
-                io.to(participantId.toString()).emit('message', { userId: conversation._id.toString(), messages: getConversationMessage?.messages || [] })
-                const conversationSender = await getConversation(participantId.toString())
-                io.to(participantId.toString()).emit('conversation', conversationSender)
-            })
-        } else {
-            const getConversationMessage = await ConversationModel.findOne({
-                "$or" : [
-                    { sender : data?.sender, receiver : data?.receiver },
-                    { sender : data?.receiver, receiver :  data?.sender}
-                ]
-            }).populate({ path: 'messages', populate: { path: 'msgByUserId', select: 'name profile_pic' } }).sort({ updatedAt : -1 })
+        if (conversation) {
+            // Populate just the single new message to save massive database and network time
+            const populatedMessage = await MessageModel.findById(saveMessage._id).populate('msgByUserId', 'name profile_pic')
 
-            io.to(data?.sender).emit('message', { userId: data?.receiver, messages: getConversationMessage?.messages || [] })
-            io.to(data?.receiver).emit('message', { userId: data?.sender, messages: getConversationMessage?.messages || [] })
+            if (conversation.isGroup) {
+                conversation.participants.forEach(async (participantId) => {
+                    io.to(participantId.toString()).emit('new-message', { userId: conversation._id.toString(), message: populatedMessage })
+                    const conversationSender = await getConversation(participantId.toString())
+                    io.to(participantId.toString()).emit('conversation', conversationSender)
+                })
+            } else {
+                io.to(data?.sender).emit('new-message', { userId: data?.receiver, message: populatedMessage })
+                io.to(data?.receiver).emit('new-message', { userId: data?.sender, message: populatedMessage })
 
-            //send conversation
-            const conversationSender = await getConversation(data?.sender)
-            const conversationReceiver = await getConversation(data?.receiver)
+                //send conversation
+                const conversationSender = await getConversation(data?.sender)
+                const conversationReceiver = await getConversation(data?.receiver)
 
-            io.to(data?.sender).emit('conversation',conversationSender)
-            io.to(data?.receiver).emit('conversation',conversationReceiver)
+                io.to(data?.sender).emit('conversation',conversationSender)
+                io.to(data?.receiver).emit('conversation',conversationReceiver)
+            }
         }
     })
 
