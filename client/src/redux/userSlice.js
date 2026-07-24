@@ -7,7 +7,8 @@ const initialState = {
   profile_pic : "",
   token : "",
   onlineUser : [],
-  socketConnection : null
+  socketConnection : null,
+  chatCache: {} // Cache for messages: { [userId]: messagesArray }
 }
 
 export const userSlice = createSlice({
@@ -30,17 +31,22 @@ export const userSlice = createSlice({
         state.profile_pic = ""
         state.token = ""
         state.socketConnection = null
+        state.chatCache = {}
     },
     setOnlineUser : (state,action)=>{
       state.onlineUser = action.payload
     },
     setSocketConnection : (state,action)=>{
       state.socketConnection = action.payload
+    },
+    setChatCache: (state, action) => {
+      const { chatId, messages } = action.payload
+      state.chatCache[chatId] = messages
     }
   },
 })
 
 // Action creators are generated for each case reducer function
-export const { setUser, setToken ,logout, setOnlineUser,setSocketConnection } = userSlice.actions
+export const { setUser, setToken ,logout, setOnlineUser,setSocketConnection, setChatCache } = userSlice.actions
 
 export default userSlice.reducer

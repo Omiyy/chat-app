@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
-import { useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'react-redux'
 import { Link, useParams } from 'react-router-dom'
 import Avatar from './Avatar'
 import { HiDotsVertical } from "react-icons/hi";
@@ -13,6 +13,7 @@ import { IoMdSend } from "react-icons/io";
 import { BsCheck2All } from "react-icons/bs";
 import Loading from './Loading';
 import toast from 'react-hot-toast';
+import { setChatCache } from '../redux/userSlice';
 import moment from 'moment'
 
 const EMOJIS = ["😊","😂","❤️","🔥","👍","🎉","😮","😢","🤔","💯","✨","👀"]
@@ -38,11 +39,18 @@ const MessagePage = () => {
   const [showEmoji, setShowEmoji] = useState(false)
   const [message, setMessage] = useState({ text: '', imageUrl: '', videoUrl: '' })
   const [loading, setLoading] = useState(false)
-  const [allMessage, setAllMessage] = useState([])
+  const dispatch = useDispatch()
+  const chatCache = useSelector(state => state?.user?.chatCache) || {}
+  const [allMessage, setAllMessage] = useState(chatCache[params.userId] || [])
   const [inputFocused, setInputFocused] = useState(false)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const attachMenuRef = useRef(null)
+
+  // Instantly load cached messages when switching tabs
+  useEffect(() => {
+    setAllMessage(chatCache[params.userId] || [])
+  }, [params.userId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -74,12 +82,18 @@ const MessagePage = () => {
       socketConnection.on('message', (data) => {
         if (Array.isArray(data)) {
           setAllMessage(data)
-        } else if (data.userId === params.userId) {
-          setAllMessage(data.messages)
+          dispatch(setChatCache({ chatId: params.userId, messages: data }))
+        } else {
+          // If the message is for the currently open chat, update the UI
+          if (data.userId === params.userId) {
+            setAllMessage(data.messages)
+          }
+          // Always update the Redux cache, even for background chats
+          dispatch(setChatCache({ chatId: data.userId, messages: data.messages }))
         }
       })
     }
-  }, [socketConnection, params?.userId, user])
+  }, [socketConnection, params?.userId, user, dispatch])
 
   const handleUploadImage = useCallback(async (e) => {
     const file = e.target.files[0]
