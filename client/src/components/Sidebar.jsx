@@ -246,7 +246,7 @@ const Sidebar = () => {
 
         {filteredUsers.map((conv) => (
           <NavLink
-            to={"/home/" + conv?.userDetails?._id}
+            to={"/home/" + (conv?.isGroup ? conv?._id : conv?.userDetails?._id)}
             key={conv?._id}
             className={({ isActive }) => `conv-item ${isActive ? 'active' : ''}`}
             role="listitem"
