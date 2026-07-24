@@ -1,4 +1,5 @@
 const { ConversationModel } = require("../models/ConversationModel")
+const { MessageModel } = require("../models/ConversationModel")
 
 const getConversation = async(currentUserId)=>{
     if(currentUserId){
@@ -8,31 +9,33 @@ const getConversation = async(currentUserId)=>{
                 { receiver : currentUserId },
                 { participants : { "$in": [currentUserId] } }
             ]
-        }).sort({  updatedAt : -1 }).populate('messages').populate('sender').populate('receiver').populate('participants')
+        }).sort({  updatedAt : -1 }).populate('sender').populate('receiver').populate('participants')
 
-        const conversation = currentUserConversation.map((conv)=>{
-            const countUnseenMsg = conv?.messages?.reduce((preve,curr) => {
-                const msgByUserId = curr?.msgByUserId?.toString()
-
-                if(msgByUserId !== currentUserId){
-                    return  preve + (curr?.seen ? 0 : 1)
-                }else{
-                    return preve
-                }
-             
-            },0)
+        const conversation = await Promise.all(currentUserConversation.map(async (conv)=>{
             
-            return{
+            const countUnseenMsg = await MessageModel.countDocuments({
+                _id: { $in: conv.messages },
+                msgByUserId: { $ne: currentUserId },
+                seen: false
+            })
+            
+            let lastMsg = null;
+            if (conv.messages && conv.messages.length > 0) {
+                const lastMsgId = conv.messages[conv.messages.length - 1];
+                lastMsg = await MessageModel.findById(lastMsgId);
+            }
+            
+            return {
                 _id : conv?._id,
                 sender : conv?.sender,
                 receiver : conv?.receiver,
                 unseenMsg : countUnseenMsg,
-                lastMsg : conv.messages[conv?.messages?.length - 1],
+                lastMsg : lastMsg,
                 isGroup : conv?.isGroup,
                 groupName : conv?.groupName,
                 participants : conv?.participants
             }
-        })
+        }))
 
         return conversation
     }else{
