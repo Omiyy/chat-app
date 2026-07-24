@@ -97,18 +97,32 @@ const MessagePage = () => {
       const handleMessageUser = (data) => setDataUser(data)
       const handleMessage = (data) => {
         if (Array.isArray(data)) {
-          setAllMessage(data)
-          dispatch(setChatCache({ chatId: params.userId, messages: data }))
+          const limited = data.slice(-30)
+          setAllMessage(limited)
+          dispatch(setChatCache({ chatId: params.userId, messages: limited }))
         } else {
           if (data.userId === params.userId) {
-            setAllMessage(data.messages)
+            setAllMessage(prev => {
+              const combined = [...prev, data.message]
+              return combined.slice(-30)
+            })
           }
-          dispatch(setChatCache({ chatId: data.userId, messages: data.messages }))
+          dispatch(setChatCache({
+            chatId: data.userId,
+            messages: (prev => {
+              const existing = (chatCache[data.userId]) || []
+              const updated = [...existing, data.message]
+              return updated.slice(-30)
+            })(null)
+          }))
         }
       }
       const handleNewMessage = (data) => {
         if (data.userId === params.userId) {
-          setAllMessage(prev => [...prev, data.message])
+          setAllMessage(prev => {
+            const combined = [...prev, data.message]
+            return combined.slice(-30)
+          })
         }
         dispatch(appendChatMessage({ chatId: data.userId, message: data.message }))
       }
@@ -123,7 +137,7 @@ const MessagePage = () => {
         socketConnection.off('new-message', handleNewMessage)
       }
     }
-  }, [socketConnection, params?.userId, user, dispatch])
+  }, [socketConnection, params?.userId, user, dispatch, chatCache])
 
   const handleUploadImage = useCallback(async (e) => {
     const file = e.target.files[0]
@@ -159,7 +173,7 @@ const MessagePage = () => {
     e.preventDefault()
     if (!message.text.trim() && !message.imageUrl && !message.videoUrl) return
     if (socketConnection) {
-      socketConnection.emit('new message', {
+      socketConnection.emit('new-message', {
         sender: user?._id,
         receiver: params.userId,
         text: message.text,

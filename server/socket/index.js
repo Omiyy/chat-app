@@ -105,8 +105,8 @@ io.on('connection',async(socket)=>{
     })
 
 
-    //new message
-    socket.on('new message',async(data)=>{
+    //new-message
+    socket.on('new-message',async(data)=>{
         let conversation;
         
         if (data.isGroup && data.conversationId) {
