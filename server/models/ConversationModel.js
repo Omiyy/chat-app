@@ -29,12 +29,12 @@ const messageSchema = new mongoose.Schema({
 const conversationSchema = new mongoose.Schema({
     sender : {
         type : mongoose.Schema.ObjectId,
-        required : true,
+        required : function() { return !this.isGroup; },
         ref : 'User'
     },
     receiver : {
         type : mongoose.Schema.ObjectId,
-        required : true,
+        required : function() { return !this.isGroup; },
         ref : 'User'
     },
     messages : [
