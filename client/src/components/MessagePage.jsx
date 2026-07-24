@@ -71,7 +71,13 @@ const MessagePage = () => {
       socketConnection.emit('message-page', params.userId)
       socketConnection.emit('seen', params.userId)
       socketConnection.on('message-user', (data) => setDataUser(data))
-      socketConnection.on('message', (data) => setAllMessage(data))
+      socketConnection.on('message', (data) => {
+        if (Array.isArray(data)) {
+          setAllMessage(data)
+        } else if (data.userId === params.userId) {
+          setAllMessage(data.messages)
+        }
+      })
     }
   }, [socketConnection, params?.userId, user])
 
@@ -231,9 +237,9 @@ const MessagePage = () => {
               )
             }
 
-            const isMine = user._id === item?.msgByUserId
+            const isMine = user._id === (item?.msgByUserId?._id || item?.msgByUserId)
             const prev = groupedMessages[groupedMessages.indexOf(item) - 1]
-            const consec = prev && prev.type === 'msg' && prev.msgByUserId === item.msgByUserId
+            const consec = prev && prev.type === 'msg' && (prev?.msgByUserId?._id || prev?.msgByUserId) === (item?.msgByUserId?._id || item?.msgByUserId)
 
             return (
               <div
@@ -247,7 +253,12 @@ const MessagePage = () => {
                 {/* Their avatar */}
                 {!isMine && (
                   <div className='flex-shrink-0' style={{ opacity: consec ? 0 : 1, transition: 'opacity 0.15s' }}>
-                    <Avatar width={28} height={28} imageUrl={dataUser?.profile_pic} name={dataUser?.name} userId={dataUser?._id} />
+                    <Avatar 
+                      width={28} height={28} 
+                      imageUrl={dataUser?.isGroup ? item?.msgByUserId?.profile_pic : dataUser?.profile_pic} 
+                      name={dataUser?.isGroup ? item?.msgByUserId?.name : dataUser?.name} 
+                      userId={dataUser?.isGroup ? (item?.msgByUserId?._id || item?.msgByUserId) : dataUser?._id} 
+                    />
                   </div>
                 )}
 
@@ -280,6 +291,12 @@ const MessagePage = () => {
                         style={{ maxHeight: 220, marginBottom: item.text ? 8 : 0 }}
                         controls
                       />
+                    )}
+                    {/* Group Sender Name */}
+                    {!isMine && dataUser?.isGroup && (
+                      <p className='text-[10.5px] font-semibold mb-1 truncate max-w-[200px]' style={{ color: 'var(--color-accent)' }}>
+                        {item?.msgByUserId?.name}
+                      </p>
                     )}
                     {/* Text */}
                     {item.text && (

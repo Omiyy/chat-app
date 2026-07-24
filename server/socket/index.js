@@ -84,7 +84,7 @@ io.on('connection',async(socket)=>{
                     { sender : user?._id, receiver : userId },
                     { sender : userId, receiver :  user?._id}
                 ]
-            }).populate('messages').sort({ updatedAt : -1 })
+            }).populate({ path: 'messages', populate: { path: 'msgByUserId', select: 'name profile_pic' } }).sort({ updatedAt : -1 })
         } else {
             // It might be a group chat
             const groupDetails = await ConversationModel.findById(userId).populate('participants');
@@ -96,12 +96,12 @@ io.on('connection',async(socket)=>{
                     participants: groupDetails.participants,
                     online: false // groups themselves don't have online status
                 }
-                getConversationMessage = await ConversationModel.findById(userId).populate('messages').sort({ updatedAt: -1 })
+                getConversationMessage = await ConversationModel.findById(userId).populate({ path: 'messages', populate: { path: 'msgByUserId', select: 'name profile_pic' } }).sort({ updatedAt: -1 })
             }
         }
         
         socket.emit('message-user',payload)
-        socket.emit('message',getConversationMessage?.messages || [])
+        socket.emit('message', { userId: userId, messages: getConversationMessage?.messages || [] })
     })
 
 
@@ -141,10 +141,10 @@ io.on('connection',async(socket)=>{
         })
 
         if (conversation.isGroup) {
-            const getConversationMessage = await ConversationModel.findById(conversation._id).populate('messages').sort({ updatedAt : -1 })
+            const getConversationMessage = await ConversationModel.findById(conversation._id).populate({ path: 'messages', populate: { path: 'msgByUserId', select: 'name profile_pic' } }).sort({ updatedAt : -1 })
             
             conversation.participants.forEach(async (participantId) => {
-                io.to(participantId.toString()).emit('message', getConversationMessage?.messages || [])
+                io.to(participantId.toString()).emit('message', { userId: conversation._id.toString(), messages: getConversationMessage?.messages || [] })
                 const conversationSender = await getConversation(participantId.toString())
                 io.to(participantId.toString()).emit('conversation', conversationSender)
             })
@@ -154,10 +154,10 @@ io.on('connection',async(socket)=>{
                     { sender : data?.sender, receiver : data?.receiver },
                     { sender : data?.receiver, receiver :  data?.sender}
                 ]
-            }).populate('messages').sort({ updatedAt : -1 })
+            }).populate({ path: 'messages', populate: { path: 'msgByUserId', select: 'name profile_pic' } }).sort({ updatedAt : -1 })
 
-            io.to(data?.sender).emit('message',getConversationMessage?.messages || [])
-            io.to(data?.receiver).emit('message',getConversationMessage?.messages || [])
+            io.to(data?.sender).emit('message', { userId: data?.receiver, messages: getConversationMessage?.messages || [] })
+            io.to(data?.receiver).emit('message', { userId: data?.sender, messages: getConversationMessage?.messages || [] })
 
             //send conversation
             const conversationSender = await getConversation(data?.sender)
@@ -217,8 +217,8 @@ io.on('connection',async(socket)=>{
                 const conversationSender = await getConversation(participantId.toString())
                 io.to(participantId.toString()).emit('conversation', conversationSender)
                 
-                const getConversationMessage = await ConversationModel.findById(conversation._id).populate('messages').sort({ updatedAt : -1 })
-                io.to(participantId.toString()).emit('message', getConversationMessage?.messages || [])
+                const getConversationMessage = await ConversationModel.findById(conversation._id).populate({ path: 'messages', populate: { path: 'msgByUserId', select: 'name profile_pic' } }).sort({ updatedAt : -1 })
+                io.to(participantId.toString()).emit('message', { userId: conversation._id.toString(), messages: getConversationMessage?.messages || [] })
             })
         } else {
             conversation = await ConversationModel.findOne({
@@ -247,10 +247,10 @@ io.on('connection',async(socket)=>{
                     { sender : user?._id, receiver : msgByUserId },
                     { sender : msgByUserId, receiver :  user?._id}
                 ]
-            }).populate('messages').sort({ updatedAt : -1 })
+            }).populate({ path: 'messages', populate: { path: 'msgByUserId', select: 'name profile_pic' } }).sort({ updatedAt : -1 })
 
-            io.to(user?._id?.toString()).emit('message', getConversationMessage?.messages || [])
-            io.to(msgByUserId).emit('message', getConversationMessage?.messages || [])
+            io.to(user?._id?.toString()).emit('message', { userId: msgByUserId, messages: getConversationMessage?.messages || [] })
+            io.to(msgByUserId).emit('message', { userId: user?._id?.toString(), messages: getConversationMessage?.messages || [] })
         }
     })
 
