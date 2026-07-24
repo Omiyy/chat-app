@@ -12,6 +12,13 @@ async function checkEmail(req,res) {
             })
         }
 
+        if(!checkEmail.isVerified){
+            return res.status(403).json({
+                message : "Email not verified. Please register again to verify your email.",
+                error : true
+            })
+        }
+
         return res.status(200).json({
             message : 'email verify',
             success : true ,

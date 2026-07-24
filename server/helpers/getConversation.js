@@ -5,9 +5,10 @@ const getConversation = async(currentUserId)=>{
         const currentUserConversation = await ConversationModel.find({
             "$or" : [
                 { sender : currentUserId },
-                { receiver : currentUserId}
+                { receiver : currentUserId },
+                { participants : { "$in": [currentUserId] } }
             ]
-        }).sort({  updatedAt : -1 }).populate('messages').populate('sender').populate('receiver')
+        }).sort({  updatedAt : -1 }).populate('messages').populate('sender').populate('receiver').populate('participants')
 
         const conversation = currentUserConversation.map((conv)=>{
             const countUnseenMsg = conv?.messages?.reduce((preve,curr) => {
@@ -26,7 +27,10 @@ const getConversation = async(currentUserId)=>{
                 sender : conv?.sender,
                 receiver : conv?.receiver,
                 unseenMsg : countUnseenMsg,
-                lastMsg : conv.messages[conv?.messages?.length - 1]
+                lastMsg : conv.messages[conv?.messages?.length - 1],
+                isGroup : conv?.isGroup,
+                groupName : conv?.groupName,
+                participants : conv?.participants
             }
         })
 

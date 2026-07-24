@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { FaUserPlus } from "react-icons/fa";
 import { NavLink, useNavigate } from 'react-router-dom';
-import { BiLogOut } from "react-icons/bi";
+import { BiLogOut, BiMessageSquareAdd } from "react-icons/bi";
 import { BsThreeDots, BsSunFill, BsMoonStarsFill } from "react-icons/bs";
 import { useTheme } from '../context/ThemeContext';
 import { IoSearchOutline } from "react-icons/io5";
@@ -10,6 +10,7 @@ import Avatar from './Avatar'
 import { useDispatch, useSelector } from 'react-redux';
 import EditUserDetails from './EditUserDetails';
 import SearchUser from './SearchUser';
+import GroupModal from './GroupModal';
 import { logout } from '../redux/userSlice';
 import moment from 'moment';
 import api from '../helpers/axios';
@@ -19,6 +20,7 @@ const Sidebar = () => {
   const [editUserOpen, setEditUserOpen] = useState(false)
   const [allUser, setAllUser] = useState([])
   const [openSearchUser, setOpenSearchUser] = useState(false)
+  const [openGroupModal, setOpenGroupModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showMenu, setShowMenu] = useState(false)
   const socketConnection = useSelector(state => state?.user?.socketConnection)
@@ -32,6 +34,9 @@ const Sidebar = () => {
       socketConnection.emit('sidebar', user._id)
       socketConnection.on('conversation', (data) => {
         const conversationUserData = data.map((conversationUser) => {
+          if (conversationUser.isGroup) {
+            return { ...conversationUser, userDetails: null }
+          }
           if (conversationUser?.sender?._id === conversationUser?.receiver?._id) {
             return { ...conversationUser, userDetails: conversationUser?.sender }
           } else if (conversationUser?.receiver?._id !== user?._id) {
@@ -74,13 +79,14 @@ const Sidebar = () => {
       console.error('Logout API error:', error)
     }
     dispatch(logout())
-    localStorage.removeItem('token')
     navigate("/email")
+    localStorage.removeItem('token')
   }, [dispatch, navigate])
 
-  const filteredUsers = allUser.filter(conv =>
-    conv?.userDetails?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredUsers = allUser.filter(conv => {
+    const name = conv?.isGroup ? conv?.groupName : conv?.userDetails?.name
+    return name?.toLowerCase().includes(searchQuery.toLowerCase())
+  })
 
   const formatTime = (dateStr) => {
     if (!dateStr) return ''
@@ -132,12 +138,20 @@ const Sidebar = () => {
             {isDark ? <BsSunFill size={14} /> : <BsMoonStarsFill size={14} />}
           </button>
           <button
+            title='New group'
+            onClick={() => setOpenGroupModal(true)}
+            className='btn-icon'
+            aria-label='Create new group'
+          >
+            <FaUserPlus size={15} />
+          </button>
+          <button
             title='New chat'
             onClick={() => setOpenSearchUser(true)}
             className='btn-icon'
             aria-label='Start new conversation'
           >
-            <MdOutlineEdit size={16} />
+            <BiMessageSquareAdd size={16} />
           </button>
           <div className='relative' ref={menuRef}>
             <button
@@ -238,7 +252,13 @@ const Sidebar = () => {
             role="listitem"
           >
             <div className='flex-shrink-0'>
-              <Avatar imageUrl={conv?.userDetails?.profile_pic} name={conv?.userDetails?.name} width={42} height={42} userId={conv?.userDetails?._id} />
+              <Avatar 
+                imageUrl={conv?.isGroup ? null : conv?.userDetails?.profile_pic} 
+                name={conv?.isGroup ? conv?.groupName : conv?.userDetails?.name} 
+                width={42} 
+                height={42} 
+                userId={conv?.isGroup ? conv?._id : conv?.userDetails?._id} 
+              />
             </div>
             <div className='flex-1 min-w-0'>
               <div className='flex justify-between items-center mb-0.5'>
@@ -249,7 +269,7 @@ const Sidebar = () => {
                     fontWeight: conv?.unseenMsg ? 600 : 400,
                   }}
                 >
-                  {conv?.userDetails?.name}
+                  {conv?.isGroup ? conv?.groupName : conv?.userDetails?.name}
                 </span>
                 <span
                   className='text-[10px] flex-shrink-0 ml-2'
@@ -301,6 +321,7 @@ const Sidebar = () => {
       {/* ── Modals ──────────────────────────────────────── */}
       {editUserOpen && <EditUserDetails onClose={() => setEditUserOpen(false)} user={user} />}
       {openSearchUser && <SearchUser onClose={() => setOpenSearchUser(false)} />}
+      {openGroupModal && <GroupModal onClose={() => setOpenGroupModal(false)} />}
     </div>
   )
 }

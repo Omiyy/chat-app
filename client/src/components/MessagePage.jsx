@@ -116,6 +116,8 @@ const MessagePage = () => {
         imageUrl: message.imageUrl,
         videoUrl: message.videoUrl,
         msgByUserId: user?._id,
+        isGroup: dataUser?.isGroup,
+        conversationId: dataUser?.isGroup ? dataUser?._id : null
       })
       setMessage({ text: '', imageUrl: '', videoUrl: '' })
       inputRef.current?.focus()
@@ -175,13 +177,19 @@ const MessagePage = () => {
                 {dataUser?.name || '...'}
               </h3>
               <div className='flex items-center gap-1.5 text-[11px] mt-0.5'>
-                {dataUser.online ? (
+                {dataUser.isGroup ? (
+                  <span style={{ color: 'var(--text-tertiary)' }}>
+                    {dataUser.participants?.length} participants
+                  </span>
+                ) : dataUser.online ? (
                   <>
                     <span className='w-1.5 h-1.5 rounded-full inline-block animate-pulse-dot' style={{ background: '#4ade80' }} />
                     <span style={{ color: '#4ade80' }}>Online</span>
                   </>
                 ) : (
-                  <span style={{ color: 'var(--text-tertiary)' }}>Offline</span>
+                  <span style={{ color: 'var(--text-tertiary)' }}>
+                    {dataUser.last_seen ? `Last seen ${moment(dataUser.last_seen).fromNow()}` : 'Offline'}
+                  </span>
                 )}
               </div>
             </div>
@@ -290,7 +298,15 @@ const MessagePage = () => {
                       >
                         {moment(item.createdAt).format('h:mm A')}
                       </span>
-                      {isMine && <BsCheck2All size={12} style={{ color: 'rgba(255,255,255,0.5)' }} />}
+                      {isMine && (
+                        <BsCheck2All 
+                          size={16} 
+                          style={{ 
+                            color: item.seen ? '#00e5ff' : 'rgba(255,255,255,0.8)',
+                            strokeWidth: 0.5 
+                          }} 
+                        />
+                      )}
                     </div>
                   </div>
                 </div>

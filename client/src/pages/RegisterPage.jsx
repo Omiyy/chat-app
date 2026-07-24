@@ -11,6 +11,8 @@ const RegisterPage = () => {
   const [data, setData] = useState({ name: "", email: "", password: "", profile_pic: "" })
   const [uploadPhoto, setUploadPhoto] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [showOTP, setShowOTP] = useState(false)
+  const [otp, setOtp] = useState("")
   const navigate = useNavigate()
 
   const handleOnChange = (e) => {
@@ -52,7 +54,24 @@ const RegisterPage = () => {
       const response = await axios.post(URL, data)
       toast.success(response.data.message)
       if (response.data.success) {
-        setData({ name: "", email: "", password: "", profile_pic: "" })
+        setShowOTP(true)
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleVerifyOTP = async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsLoading(true)
+    const URL = `${import.meta.env.VITE_BACKEND_URL}/api/verify-otp`
+    try {
+      const response = await axios.post(URL, { email: data.email, otp })
+      toast.success(response.data.message)
+      if (response.data.success) {
         navigate('/email')
       }
     } catch (error) {
@@ -76,82 +95,121 @@ const RegisterPage = () => {
     >
       <div className='mb-6'>
         <h2 className='text-2xl font-bold mb-1' style={{ color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
-          Create account
+          {showOTP ? 'Verify your email' : 'Create account'}
         </h2>
         <p className='text-[13px]' style={{ color: 'var(--text-tertiary)' }}>
-          Fill in your details to get started
+          {showOTP ? 'Enter the 6-digit code sent to your email' : 'Fill in your details to get started'}
         </p>
       </div>
 
-      {/* Photo upload */}
-      <div className='flex justify-center mb-6'>
-        <label htmlFor='profile_pic' className='cursor-pointer relative inline-block'>
-          <div
-            className='w-[72px] h-[72px] rounded-full flex items-center justify-center overflow-hidden transition-colors duration-200'
-            style={{
-              border: `2px dashed ${data.profile_pic ? 'var(--color-accent)' : 'var(--border-primary)'}`,
-              background: 'var(--input-bg)',
-            }}
-          >
-            {data.profile_pic ? (
-              <img src={data.profile_pic} alt='avatar' className='w-full h-full object-cover' />
-            ) : (
-              <div className='flex flex-col items-center gap-1' style={{ color: 'var(--text-tertiary)' }}>
-                <FaCamera size={18} />
-                <span className='text-[10px] font-medium'>Photo</span>
+      {!showOTP ? (
+        <>
+          {/* Photo upload */}
+          <div className='flex justify-center mb-6'>
+            <label htmlFor='profile_pic' className='cursor-pointer relative inline-block'>
+              <div
+                className='w-[72px] h-[72px] rounded-full flex items-center justify-center overflow-hidden transition-colors duration-200'
+                style={{
+                  border: `2px dashed ${data.profile_pic ? 'var(--color-accent)' : 'var(--border-primary)'}`,
+                  background: 'var(--input-bg)',
+                }}
+              >
+                {data.profile_pic ? (
+                  <img src={data.profile_pic} alt='avatar' className='w-full h-full object-cover' />
+                ) : (
+                  <div className='flex flex-col items-center gap-1' style={{ color: 'var(--text-tertiary)' }}>
+                    <FaCamera size={18} />
+                    <span className='text-[10px] font-medium'>Photo</span>
+                  </div>
+                )}
               </div>
-            )}
+              {data.profile_pic && (
+                <button
+                  type='button'
+                  onClick={handleClearUploadPhoto}
+                  className='absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full flex items-center justify-center border-none'
+                  style={{ background: '#ef4444', color: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.25)' }}
+                  aria-label='Remove photo'
+                >
+                  <IoClose size={11} />
+                </button>
+              )}
+              <input type='file' id='profile_pic' className='hidden' onChange={handleUploadPhoto} accept='image/*' />
+            </label>
           </div>
-          {data.profile_pic && (
-            <button
-              type='button'
-              onClick={handleClearUploadPhoto}
-              className='absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full flex items-center justify-center border-none'
-              style={{ background: '#ef4444', color: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.25)' }}
-              aria-label='Remove photo'
-            >
-              <IoClose size={11} />
-            </button>
-          )}
-          <input type='file' id='profile_pic' className='hidden' onChange={handleUploadPhoto} accept='image/*' />
-        </label>
-      </div>
 
-      <form onSubmit={handleSubmit} className='flex flex-col gap-3.5'>
-        {FIELDS.map(({ id, type, label, placeholder }) => (
-          <div key={id} className='flex flex-col gap-1.5'>
-            <label htmlFor={id} className='text-[13px] font-medium' style={{ color: 'var(--text-secondary)' }}>
-              {label}
+          <form onSubmit={handleSubmit} className='flex flex-col gap-3.5'>
+            {FIELDS.map(({ id, type, label, placeholder }) => (
+              <div key={id} className='flex flex-col gap-1.5'>
+                <label htmlFor={id} className='text-[13px] font-medium' style={{ color: 'var(--text-secondary)' }}>
+                  {label}
+                </label>
+                <input
+                  type={type}
+                  id={id}
+                  name={id}
+                  placeholder={placeholder}
+                  value={data[id]}
+                  onChange={handleOnChange}
+                  required
+                  className='input-field'
+                />
+              </div>
+            ))}
+
+            <button
+              type='submit'
+              disabled={isLoading}
+              className='btn-primary w-full py-3 mt-1 text-[14px] font-semibold'
+              style={{ borderRadius: 10 }}
+            >
+              {isLoading ? 'Creating account...' : 'Create Account →'}
+            </button>
+          </form>
+
+          <p className='mt-5 text-center text-[13px]' style={{ color: 'var(--text-tertiary)' }}>
+            Already have an account?{' '}
+            <Link to='/email' className='font-semibold' style={{ color: 'var(--color-accent)' }}>
+              Sign in
+            </Link>
+          </p>
+        </>
+      ) : (
+        <form onSubmit={handleVerifyOTP} className='flex flex-col gap-3.5'>
+          <div className='flex flex-col gap-1.5'>
+            <label htmlFor="otp" className='text-[13px] font-medium' style={{ color: 'var(--text-secondary)' }}>
+              Verification Code
             </label>
             <input
-              type={type}
-              id={id}
-              name={id}
-              placeholder={placeholder}
-              value={data[id]}
-              onChange={handleOnChange}
+              type="text"
+              id="otp"
+              name="otp"
+              placeholder="123456"
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
               required
-              className='input-field'
+              className='input-field text-center tracking-[0.5em] font-bold text-lg'
+              maxLength={6}
             />
           </div>
-        ))}
 
-        <button
-          type='submit'
-          disabled={isLoading}
-          className='btn-primary w-full py-3 mt-1 text-[14px] font-semibold'
-          style={{ borderRadius: 10 }}
-        >
-          {isLoading ? 'Creating account...' : 'Create Account →'}
-        </button>
-      </form>
-
-      <p className='mt-5 text-center text-[13px]' style={{ color: 'var(--text-tertiary)' }}>
-        Already have an account?{' '}
-        <Link to='/email' className='font-semibold' style={{ color: 'var(--color-accent)' }}>
-          Sign in
-        </Link>
-      </p>
+          <button
+            type='submit'
+            disabled={isLoading || otp.length < 6}
+            className='btn-primary w-full py-3 mt-1 text-[14px] font-semibold'
+            style={{ borderRadius: 10 }}
+          >
+            {isLoading ? 'Verifying...' : 'Verify Email'}
+          </button>
+          
+          <p className='mt-5 text-center text-[13px]' style={{ color: 'var(--text-tertiary)' }}>
+            Didn't receive the code?{' '}
+            <button type="button" onClick={handleSubmit} className='font-semibold border-none bg-transparent' style={{ color: 'var(--color-accent)' }}>
+              Resend
+            </button>
+          </p>
+        </form>
+      )}
     </AuthCard>
   )
 }

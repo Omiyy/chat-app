@@ -33,20 +33,13 @@ const Home = () => {
     fetchUserDetails()
   }, [])
 
-  // Redirect to email if no token
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      navigate('/email')
-    }
-  }, [navigate])
+  // Redirect to email if not authenticated (handled by axios interceptor on API failure)
+  // Let fetchUserDetails manage the authentication state
 
   /***socket connection */
   useEffect(() => {
     const socketConnection = io(import.meta.env.VITE_BACKEND_URL, {
-      auth: {
-        token: localStorage.getItem('token')
-      },
+      withCredentials: true
     })
 
     socketConnection.on('onlineUser', (data) => {

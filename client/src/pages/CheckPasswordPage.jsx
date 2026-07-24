@@ -37,8 +37,8 @@ const CheckPasswordPage = () => {
       })
       toast.success(response.data.message)
       if (response.data.success) {
-        dispatch(setToken(response?.data?.token))
-        localStorage.setItem('token', response?.data?.token)
+        dispatch(setToken(null)) // Deprecated token pattern, using HttpOnly cookies now
+        localStorage.setItem('token', 'true') // Dummy token flag to satisfy generic router checks if they exist
         setData({ password: "" })
         navigate('/home')
       }

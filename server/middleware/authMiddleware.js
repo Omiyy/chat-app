@@ -9,7 +9,7 @@ const getUserDetailsFromToken = require('../helpers/getUserDetailsFromToken')
  */
 async function authMiddleware(req, res, next) {
     try {
-        const token = req.cookies.token || ''
+        const token = req.cookies.accessToken || req.cookies.token || ''
 
         if (!token) {
             return res.status(401).json({

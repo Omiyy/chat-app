@@ -42,10 +42,37 @@ const conversationSchema = new mongoose.Schema({
             type : mongoose.Schema.ObjectId,
             ref : 'Message'
         }
-    ]
+    ],
+    // Group Chat Fields
+    isGroup: {
+        type: Boolean,
+        default: false
+    },
+    groupName: {
+        type: String,
+        default: ""
+    },
+    groupAdmin: {
+        type: mongoose.Schema.ObjectId,
+        ref: 'User'
+    },
+    participants: [
+        {
+            type: mongoose.Schema.ObjectId,
+            ref: 'User'
+        }
+    ],
+    // Store the last read message for each participant to manage O(1) read receipts
+    readReceipts: {
+        type: Map,
+        of: mongoose.Schema.ObjectId, // participantId -> messageId
+        default: {}
+    }
 },{
     timestamps : true
 })
+
+// MongoDB inherently indexes _id so no explicit index is needed
 
 const MessageModel = mongoose.model('Message',messageSchema)
 const ConversationModel = mongoose.model('Conversation',conversationSchema)
