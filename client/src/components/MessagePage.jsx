@@ -63,6 +63,8 @@ const MessagePage = () => {
         isGroup: targetConv.isGroup,
         participants: targetConv.participants
       }))
+    } else {
+      setDataUser({ name: '', email: '', profile_pic: '', online: false, _id: params.userId, isGroup: false })
     }
   }, [params.userId, allConversations])
 
@@ -92,28 +94,34 @@ const MessagePage = () => {
     if (socketConnection) {
       socketConnection.emit('message-page', params.userId)
       socketConnection.emit('seen', params.userId)
-      socketConnection.on('message-user', (data) => setDataUser(data))
-      socketConnection.on('message', (data) => {
+      const handleMessageUser = (data) => setDataUser(data)
+      const handleMessage = (data) => {
         if (Array.isArray(data)) {
           setAllMessage(data)
           dispatch(setChatCache({ chatId: params.userId, messages: data }))
         } else {
-          // If the message is for the currently open chat, update the UI
           if (data.userId === params.userId) {
             setAllMessage(data.messages)
           }
-          // Always update the Redux cache, even for background chats
           dispatch(setChatCache({ chatId: data.userId, messages: data.messages }))
         }
-      })
-      
-      socketConnection.on('new-message', (data) => {
-        // Incremental update for ultra-fast messaging!
+      }
+      const handleNewMessage = (data) => {
         if (data.userId === params.userId) {
           setAllMessage(prev => [...prev, data.message])
         }
         dispatch(appendChatMessage({ chatId: data.userId, message: data.message }))
-      })
+      }
+
+      socketConnection.on('message-user', handleMessageUser)
+      socketConnection.on('message', handleMessage)
+      socketConnection.on('new-message', handleNewMessage)
+
+      return () => {
+        socketConnection.off('message-user', handleMessageUser)
+        socketConnection.off('message', handleMessage)
+        socketConnection.off('new-message', handleNewMessage)
+      }
     }
   }, [socketConnection, params?.userId, user, dispatch])
 
