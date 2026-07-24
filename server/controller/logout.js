@@ -6,7 +6,9 @@ async function logout(req,res) {
             sameSite : "None",
             maxAge : 0
         }
-        return res.cookie('token' , '' , cookieOption).status(200).json({
+        res.clearCookie('accessToken', cookieOption)
+        res.clearCookie('refreshToken', cookieOption)
+        return res.status(200).json({
             message : "session-out",
             success : true
         })

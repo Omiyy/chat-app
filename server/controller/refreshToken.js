@@ -45,7 +45,7 @@ async function refreshToken(req, res) {
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     });
 
-    const cookieOption = { httpOnly: true, secure: true, sameSite: 'strict' };
+    const cookieOption = { httpOnly: true, secure: true, sameSite: 'None' };
     res.cookie('accessToken', newAccessToken, { ...cookieOption, maxAge: 15 * 60 * 1000 });
     res.cookie('refreshToken', newRefreshToken, { ...cookieOption, maxAge: 7 * 24 * 60 * 60 * 1000 });
 

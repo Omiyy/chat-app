@@ -39,7 +39,7 @@ async function checkPassword(req , res)
         const cookieOption = {
             httpOnly : true,
             secure : true,
-            sameSite : "strict"
+            sameSite : "None"
         }
 
         res.cookie('accessToken', accessToken, { ...cookieOption, maxAge: 15 * 60 * 1000 })
