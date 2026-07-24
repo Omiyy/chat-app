@@ -14,6 +14,7 @@ import { BsCheck2All } from "react-icons/bs";
 import Loading from './Loading';
 import toast from 'react-hot-toast';
 import { setChatCache, appendChatMessage } from '../redux/userSlice';
+import { loadCachedMessages } from '../helpers/chatCache';
 import moment from 'moment'
 
 const EMOJIS = ["😊","😂","❤️","🔥","👍","🎉","😮","😢","🤔","💯","✨","👀"]
@@ -29,12 +30,31 @@ const isValidMediaUrl = (url) => {
   }
 }
 
+// ── Helper: always show groupName for groups, other user's name for DMs ──
+function getConversationDisplay(conversation, currentUserId) {
+  if (!conversation) return { name: '', profile_pic: '', isGroup: false }
+  if (conversation.isGroup) {
+    return {
+      name: conversation.groupName || 'Unnamed Group',
+      profile_pic: '',
+      isGroup: true,
+      participants: conversation.participants
+    }
+  }
+  // 1-on-1: use userDetails from sidebar data
+  return {
+    name: conversation.userDetails?.name || '',
+    profile_pic: conversation.userDetails?.profile_pic || '',
+    isGroup: false
+  }
+}
+
 const MessagePage = () => {
   const params = useParams()
   const socketConnection = useSelector(state => state?.user?.socketConnection)
   const user = useSelector(state => state?.user)
 
-  const [dataUser, setDataUser] = useState({ name: '', email: '', profile_pic: '', online: false, _id: '' })
+  const [dataUser, setDataUser] = useState({ name: '', email: '', profile_pic: '', online: false, _id: '', isGroup: false })
   const [openAttachMenu, setOpenAttachMenu] = useState(false)
   const [showEmoji, setShowEmoji] = useState(false)
   const [message, setMessage] = useState({ text: '', imageUrl: '', videoUrl: '' })
@@ -42,26 +62,32 @@ const MessagePage = () => {
   const dispatch = useDispatch()
   const chatCache = useSelector(state => state?.user?.chatCache) || {}
   const allConversations = useSelector(state => state?.user?.conversations) || []
-  const [allMessage, setAllMessage] = useState(chatCache[params.userId] || [])
+
+  // ── Stale-while-revalidate: load from Redux cache first, fallback to localStorage ──
+  const [allMessage, setAllMessage] = useState(() => {
+    return chatCache[params.userId] || loadCachedMessages(params.userId)
+  })
   const [inputFocused, setInputFocused] = useState(false)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const attachMenuRef = useRef(null)
 
-  // Instantly load cached messages and header info when switching tabs
+  // ── Instantly load header info from Redux conversations ──
+  // This is locked to groupName for groups and never changes from socket data
   useEffect(() => {
-    setAllMessage(chatCache[params.userId] || [])
-    
-    // Instantly set the header data from Redux conversations so we don't wait for socket!
+    // Load cached messages immediately
+    setAllMessage(chatCache[params.userId] || loadCachedMessages(params.userId))
+
     const targetConv = allConversations.find(c => c._id === params.userId || c.userDetails?._id === params.userId)
     if (targetConv) {
+      const display = getConversationDisplay(targetConv, user._id)
       setDataUser(prev => ({
         ...prev,
-        name: targetConv.isGroup ? targetConv.groupName : targetConv.userDetails?.name,
-        profile_pic: targetConv.isGroup ? '' : targetConv.userDetails?.profile_pic,
+        name: display.name,
+        profile_pic: display.profile_pic,
         _id: targetConv.isGroup ? targetConv._id : targetConv.userDetails?._id,
-        isGroup: targetConv.isGroup,
-        participants: targetConv.participants
+        isGroup: display.isGroup,
+        participants: display.participants
       }))
     } else {
       setDataUser({ name: '', email: '', profile_pic: '', online: false, _id: params.userId, isGroup: false })
@@ -90,54 +116,66 @@ const MessagePage = () => {
     return () => document.removeEventListener('keydown', handler)
   }, [showEmoji])
 
+  // ── Socket listeners: message-page data + incremental new-message ──
   useEffect(() => {
-    if (socketConnection) {
-      socketConnection.emit('message-page', params.userId)
-      socketConnection.emit('seen', params.userId)
-      const handleMessageUser = (data) => setDataUser(data)
-      const handleMessage = (data) => {
-        if (Array.isArray(data)) {
-          const limited = data.slice(-30)
-          setAllMessage(limited)
-          dispatch(setChatCache({ chatId: params.userId, messages: limited }))
-        } else {
-          if (data.userId === params.userId) {
-            setAllMessage(prev => {
-              const combined = [...prev, data.message]
-              return combined.slice(-30)
-            })
-          }
-          dispatch(setChatCache({
-            chatId: data.userId,
-            messages: (prev => {
-              const existing = (chatCache[data.userId]) || []
-              const updated = [...existing, data.message]
-              return updated.slice(-30)
-            })(null)
-          }))
-        }
-      }
-      const handleNewMessage = (data) => {
-        if (data.userId === params.userId) {
-          setAllMessage(prev => {
-            const combined = [...prev, data.message]
-            return combined.slice(-30)
-          })
-        }
-        dispatch(appendChatMessage({ chatId: data.userId, message: data.message }))
-      }
+    if (!socketConnection) return
 
-      socketConnection.on('message-user', handleMessageUser)
-      socketConnection.on('message', handleMessage)
-      socketConnection.on('new-message', handleNewMessage)
+    socketConnection.emit('message-page', params.userId)
+    socketConnection.emit('seen', params.userId)
 
-      return () => {
-        socketConnection.off('message-user', handleMessageUser)
-        socketConnection.off('message', handleMessage)
-        socketConnection.off('new-message', handleNewMessage)
+    const handleMessageUser = (data) => {
+      // For groups, NEVER let socket data override groupName
+      setDataUser(prev => {
+        if (prev.isGroup) {
+          // Only update online/participants, LOCK the name to groupName
+          return { ...prev, online: data.online, participants: data.participants }
+        }
+        return data
+      })
+    }
+
+    const handleMessage = (data) => {
+      // Full message load from server (on first open or refresh)
+      if (data && data.userId === params.userId) {
+        const msgs = Array.isArray(data.messages) ? data.messages.slice(-30) : []
+        setAllMessage(msgs)
+        dispatch(setChatCache({ chatId: params.userId, messages: msgs }))
+      } else if (Array.isArray(data)) {
+        const limited = data.slice(-30)
+        setAllMessage(limited)
+        dispatch(setChatCache({ chatId: params.userId, messages: limited }))
       }
     }
-  }, [socketConnection, params?.userId, user, dispatch, chatCache])
+
+    const handleNewMessage = (data) => {
+      // Incremental single message from server
+      if (data.userId === params.userId || data.conversationId === params.userId) {
+        setAllMessage(prev => {
+          // Deduplicate: check if message already exists (optimistic UI)
+          const exists = prev.some(m => m._id === data.message._id || m.tempId === data.message.tempId)
+          if (exists) {
+            // Replace the optimistic message with the real one
+            return prev.map(m => 
+              (m.tempId && m.tempId === data.message.tempId) ? data.message : m
+            ).slice(-30)
+          }
+          return [...prev, data.message].slice(-30)
+        })
+      }
+      const chatId = data.conversationId || data.userId
+      dispatch(appendChatMessage({ chatId, message: data.message }))
+    }
+
+    socketConnection.on('message-user', handleMessageUser)
+    socketConnection.on('message', handleMessage)
+    socketConnection.on('new-message', handleNewMessage)
+
+    return () => {
+      socketConnection.off('message-user', handleMessageUser)
+      socketConnection.off('message', handleMessage)
+      socketConnection.off('new-message', handleNewMessage)
+    }
+  }, [socketConnection, params.userId, dispatch])
 
   const handleUploadImage = useCallback(async (e) => {
     const file = e.target.files[0]
@@ -169,24 +207,57 @@ const MessagePage = () => {
     }
   }, [])
 
+  // ── Optimistic Send: render message INSTANTLY, then confirm via socket ──
   const handleSendMessage = useCallback((e) => {
     e.preventDefault()
     if (!message.text.trim() && !message.imageUrl && !message.videoUrl) return
-    if (socketConnection) {
-      socketConnection.emit('new-message', {
-        sender: user?._id,
-        receiver: params.userId,
-        text: message.text,
-        imageUrl: message.imageUrl,
-        videoUrl: message.videoUrl,
-        msgByUserId: user?._id,
-        isGroup: dataUser?.isGroup,
-        conversationId: dataUser?.isGroup ? dataUser?._id : null
-      })
-      setMessage({ text: '', imageUrl: '', videoUrl: '' })
-      inputRef.current?.focus()
+    if (!socketConnection) return
+
+    const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+
+    // Create optimistic message object
+    const optimisticMessage = {
+      _id: tempId,
+      tempId: tempId,
+      text: message.text,
+      imageUrl: message.imageUrl,
+      videoUrl: message.videoUrl,
+      msgByUserId: { _id: user._id, name: user.name, profile_pic: user.profile_pic },
+      createdAt: new Date().toISOString(),
+      seen: false,
+      status: 'sending' // Optimistic status
     }
-  }, [message, socketConnection, user?._id, params.userId])
+
+    // 1. INSTANTLY append to UI — zero wait
+    setAllMessage(prev => [...prev, optimisticMessage].slice(-30))
+
+    // 2. Emit to server
+    socketConnection.emit('new-message', {
+      sender: user?._id,
+      receiver: params.userId,
+      text: message.text,
+      imageUrl: message.imageUrl,
+      videoUrl: message.videoUrl,
+      msgByUserId: user?._id,
+      isGroup: dataUser?.isGroup,
+      conversationId: dataUser?.isGroup ? dataUser?._id : null,
+      tempId: tempId
+    })
+
+    // 3. Clear input immediately
+    setMessage({ text: '', imageUrl: '', videoUrl: '' })
+    inputRef.current?.focus()
+
+    // 4. Set a 10-second timeout to mark as failed if no server ack
+    setTimeout(() => {
+      setAllMessage(prev => prev.map(m =>
+        m.tempId === tempId && m.status === 'sending'
+          ? { ...m, status: 'failed' }
+          : m
+      ))
+    }, 10000)
+
+  }, [message, socketConnection, user, params.userId, dataUser])
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -194,6 +265,14 @@ const MessagePage = () => {
       handleSendMessage(e)
     }
   }, [handleSendMessage])
+
+  const handleRetry = useCallback((failedMsg) => {
+    if (!socketConnection) return
+    // Remove the failed message
+    setAllMessage(prev => prev.filter(m => m.tempId !== failedMsg.tempId))
+    // Re-emit
+    setMessage({ text: failedMsg.text || '', imageUrl: failedMsg.imageUrl || '', videoUrl: failedMsg.videoUrl || '' })
+  }, [socketConnection])
 
   const groupedMessages = allMessage.reduce((acc, msg, idx) => {
     const dateKey = moment(msg.createdAt).format('YYYY-MM-DD')
@@ -306,6 +385,8 @@ const MessagePage = () => {
                 style={{
                   justifyContent: isMine ? 'flex-end' : 'flex-start',
                   marginBottom: consec ? 2 : 12,
+                  opacity: item.status === 'sending' ? 0.7 : 1,
+                  transition: 'opacity 0.2s'
                 }}
               >
                 {/* Their avatar */}
@@ -365,7 +446,7 @@ const MessagePage = () => {
                         {item.text}
                       </p>
                     )}
-                    {/* Timestamp */}
+                    {/* Timestamp + Status */}
                     <div className='flex items-center justify-end gap-1 mt-1'>
                       <span
                         className='text-[10px] whitespace-nowrap'
@@ -374,13 +455,25 @@ const MessagePage = () => {
                         {moment(item.createdAt).format('h:mm A')}
                       </span>
                       {isMine && (
-                        <BsCheck2All 
-                          size={16} 
-                          style={{ 
-                            color: item.seen ? '#00e5ff' : 'rgba(255,255,255,0.8)',
-                            strokeWidth: 0.5 
-                          }} 
-                        />
+                        item.status === 'sending' ? (
+                          <span className='text-[10px]' style={{ color: 'rgba(255,255,255,0.5)' }}>⏳</span>
+                        ) : item.status === 'failed' ? (
+                          <button 
+                            onClick={() => handleRetry(item)}
+                            className='text-[10px] bg-transparent border-none cursor-pointer'
+                            style={{ color: '#ef4444' }}
+                          >
+                            ⚠ Retry
+                          </button>
+                        ) : (
+                          <BsCheck2All 
+                            size={16} 
+                            style={{ 
+                              color: item.seen ? '#00e5ff' : 'rgba(255,255,255,0.8)',
+                              strokeWidth: 0.5 
+                            }} 
+                          />
+                        )
                       )}
                     </div>
                   </div>

@@ -32,9 +32,11 @@ const Sidebar = () => {
   useEffect(() => {
     if (socketConnection) {
       socketConnection.emit('sidebar', user._id)
-      socketConnection.on('conversation', (data) => {
+      
+      const handleConversation = (data) => {
         const conversationUserData = data.map((conversationUser) => {
           if (conversationUser.isGroup) {
+            // LOCK: always use groupName for group chats, never override with user details
             return { ...conversationUser, userDetails: null }
           }
           if (conversationUser?.sender?._id === conversationUser?.receiver?._id) {
@@ -46,9 +48,16 @@ const Sidebar = () => {
           }
         })
         dispatch(setConversations(conversationUserData))
-      })
+      }
+
+      socketConnection.on('conversation', handleConversation)
+
+      // ── Cleanup: remove listener on unmount/re-render ──
+      return () => {
+        socketConnection.off('conversation', handleConversation)
+      }
     }
-  }, [socketConnection, user])
+  }, [socketConnection, user._id, dispatch])
 
   // Close menu on Escape key
   useEffect(() => {

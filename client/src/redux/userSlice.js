@@ -1,4 +1,8 @@
 import { createSlice } from '@reduxjs/toolkit'
+import { loadCachedConversations, loadCachedMessages, cacheConversations, cacheMessages, clearAllChatCache } from '../helpers/chatCache'
+
+// ── Stale-While-Revalidate: hydrate from localStorage on boot ──
+const cachedConversations = loadCachedConversations()
 
 const initialState = {
   _id : "",
@@ -8,8 +12,8 @@ const initialState = {
   token : "",
   onlineUser : [],
   socketConnection : null,
-  chatCache: {}, // Cache for messages: { [userId]: messagesArray }
-  conversations: [] // Cache for sidebar conversation list
+  chatCache: {}, // Runtime cache: { [userId]: messagesArray }
+  conversations: cachedConversations // Hydrate sidebar instantly from localStorage
 }
 
 export const userSlice = createSlice({
@@ -34,6 +38,7 @@ export const userSlice = createSlice({
         state.socketConnection = null
         state.chatCache = {}
         state.conversations = []
+        clearAllChatCache()
     },
     setOnlineUser : (state,action)=>{
       state.onlineUser = action.payload
@@ -43,18 +48,31 @@ export const userSlice = createSlice({
     },
     setChatCache: (state, action) => {
       const { chatId, messages } = action.payload
-      state.chatCache[chatId] = messages
+      const trimmed = messages.slice(-30)
+      state.chatCache[chatId] = trimmed
+      // Persist to localStorage
+      cacheMessages(chatId, trimmed)
     },
     setConversations: (state, action) => {
       state.conversations = action.payload
+      // Persist to localStorage for instant load on refresh
+      cacheConversations(action.payload)
     },
     appendChatMessage: (state, action) => {
       const { chatId, message } = action.payload
-      if (state.chatCache[chatId]) {
-        state.chatCache[chatId].push(message)
-      } else {
-        state.chatCache[chatId] = [message]
+      if (!state.chatCache[chatId]) {
+        state.chatCache[chatId] = []
       }
+      // Prevent duplicate messages (optimistic UI may have already added it)
+      const exists = state.chatCache[chatId].some(m => m._id === message._id)
+      if (!exists) {
+        state.chatCache[chatId].push(message)
+        // Trim to last 30
+        if (state.chatCache[chatId].length > 30) {
+          state.chatCache[chatId] = state.chatCache[chatId].slice(-30)
+        }
+      }
+      cacheMessages(chatId, state.chatCache[chatId])
     }
   },
 })

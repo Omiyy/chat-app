@@ -23,7 +23,11 @@ const io = new Server(server, {
         origin: process.env.FRONTEND_URL?.replace(/\/+$/, ''),
         credentials: true,
         methods: ["GET", "POST"]
-    }
+    },
+    // ── Prevent premature connection drops ──
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    maxHttpBufferSize: 1e6
 })
 
 /***
@@ -105,62 +109,93 @@ io.on('connection',async(socket)=>{
     })
 
 
-    //new-message
+    //new-message — NON-BLOCKING: emit first, update sidebar in background
     socket.on('new-message',async(data)=>{
-        let conversation;
-        
-        if (data.isGroup && data.conversationId) {
-            conversation = await ConversationModel.findById(data.conversationId);
-        } else {
-            conversation = await ConversationModel.findOne({
-                "$or" : [
-                    { sender : data?.sender, receiver : data?.receiver },
-                    { sender : data?.receiver, receiver :  data?.sender}
-                ]
-            })
-            //if conversation is not available
-            if(!conversation){
-                const createConversation = await ConversationModel({
-                    sender : data?.sender,
-                    receiver : data?.receiver
+        try {
+            let conversation;
+            
+            if (data.isGroup && data.conversationId) {
+                conversation = await ConversationModel.findById(data.conversationId);
+            } else {
+                conversation = await ConversationModel.findOne({
+                    "$or" : [
+                        { sender : data?.sender, receiver : data?.receiver },
+                        { sender : data?.receiver, receiver :  data?.sender}
+                    ]
                 })
-                conversation = await createConversation.save()
+                //if conversation is not available
+                if(!conversation){
+                    const createConversation = await ConversationModel({
+                        sender : data?.sender,
+                        receiver : data?.receiver
+                    })
+                    conversation = await createConversation.save()
+                }
             }
-        }
-        
-        const message = new MessageModel({
-          text : data.text,
-          imageUrl : data.imageUrl,
-          videoUrl : data.videoUrl,
-          msgByUserId :  data?.msgByUserId,
-        })
-        const saveMessage = await message.save()
+            
+            // 1. Save message
+            const message = new MessageModel({
+              text : data.text,
+              imageUrl : data.imageUrl,
+              videoUrl : data.videoUrl,
+              msgByUserId :  data?.msgByUserId,
+            })
+            const saveMessage = await message.save()
 
-        const updateConversation = await ConversationModel.updateOne({ _id : conversation?._id },{
-            "$push" : { messages : saveMessage?._id }
-        })
+            // 2. Push message ID to conversation (don't await — fire and forget)
+            ConversationModel.updateOne({ _id : conversation?._id },{
+                "$push" : { messages : saveMessage?._id }
+            }).exec()
 
-        if (conversation) {
-            // Populate just the single new message to save massive database and network time
+            // 3. IMMEDIATELY populate and emit — don't wait for sidebar updates
             const populatedMessage = await MessageModel.findById(saveMessage._id).populate('msgByUserId', 'name profile_pic')
 
             if (conversation.isGroup) {
-                conversation.participants.forEach(async (participantId) => {
-                    io.to(participantId.toString()).emit('new-message', { userId: conversation._id.toString(), message: populatedMessage })
-                    const conversationSender = await getConversation(participantId.toString())
-                    io.to(participantId.toString()).emit('conversation', conversationSender)
+                conversation.participants.forEach(participantId => {
+                    io.to(participantId.toString()).emit('new-message', {
+                        conversationId: conversation._id.toString(),
+                        userId: conversation._id.toString(),
+                        message: populatedMessage,
+                        isGroup: true,
+                        groupName: conversation.groupName
+                    })
                 })
             } else {
-                io.to(data?.sender).emit('new-message', { userId: data?.receiver, message: populatedMessage })
-                io.to(data?.receiver).emit('new-message', { userId: data?.sender, message: populatedMessage })
-
-                //send conversation
-                const conversationSender = await getConversation(data?.sender)
-                const conversationReceiver = await getConversation(data?.receiver)
-
-                io.to(data?.sender).emit('conversation',conversationSender)
-                io.to(data?.receiver).emit('conversation',conversationReceiver)
+                io.to(data?.sender).emit('new-message', {
+                    userId: data?.receiver,
+                    message: populatedMessage,
+                    isGroup: false
+                })
+                io.to(data?.receiver).emit('new-message', {
+                    userId: data?.sender,
+                    message: populatedMessage,
+                    isGroup: false
+                })
             }
+
+            // 4. Update sidebar conversations IN THE BACKGROUND (non-blocking)
+            setImmediate(async () => {
+                try {
+                    if (conversation.isGroup) {
+                        for (const participantId of conversation.participants) {
+                            const convData = await getConversation(participantId.toString())
+                            io.to(participantId.toString()).emit('conversation', convData)
+                        }
+                    } else {
+                        const [conversationSender, conversationReceiver] = await Promise.all([
+                            getConversation(data?.sender),
+                            getConversation(data?.receiver)
+                        ])
+                        io.to(data?.sender).emit('conversation', conversationSender)
+                        io.to(data?.receiver).emit('conversation', conversationReceiver)
+                    }
+                } catch (err) {
+                    console.error('Background sidebar update error:', err)
+                }
+            })
+
+        } catch (err) {
+            console.error('new-message handler error:', err)
         }
     })
 
@@ -203,18 +238,21 @@ io.on('connection',async(socket)=>{
         if (conversation && conversation.isGroup) {
             const conversationMessageId = conversation?.messages || []
 
-            const updateMessages  = await MessageModel.updateMany(
+            await MessageModel.updateMany(
                 { _id : { "$in" : conversationMessageId }, msgByUserId : { "$ne": user._id } },
                 { "$set" : { seen : true }}
             )
 
-            // Emit to all participants
-            conversation.participants.forEach(async (participantId) => {
-                const conversationSender = await getConversation(participantId.toString())
-                io.to(participantId.toString()).emit('conversation', conversationSender)
-                
-                const getConversationMessage = await ConversationModel.findById(conversation._id).slice('messages', -30).populate({ path: 'messages', populate: { path: 'msgByUserId', select: 'name profile_pic' } }).sort({ updatedAt : -1 })
-                io.to(participantId.toString()).emit('message', { userId: conversation._id.toString(), messages: getConversationMessage?.messages || [] })
+            // Background update for participants
+            setImmediate(async () => {
+                try {
+                    for (const participantId of conversation.participants) {
+                        const conversationSender = await getConversation(participantId.toString())
+                        io.to(participantId.toString()).emit('conversation', conversationSender)
+                    }
+                } catch (err) {
+                    console.error('seen group background error:', err)
+                }
             })
         } else {
             conversation = await ConversationModel.findOne({
@@ -226,27 +264,24 @@ io.on('connection',async(socket)=>{
 
             const conversationMessageId = conversation?.messages || []
 
-            const updateMessages  = await MessageModel.updateMany(
+            await MessageModel.updateMany(
                 { _id : { "$in" : conversationMessageId }, msgByUserId : msgByUserId },
                 { "$set" : { seen : true }}
             )
 
-            //send conversation
-            const conversationSender = await getConversation(user?._id?.toString())
-            const conversationReceiver = await getConversation(msgByUserId)
-
-            io.to(user?._id?.toString()).emit('conversation',conversationSender)
-            io.to(msgByUserId).emit('conversation',conversationReceiver)
-            
-            const getConversationMessage = await ConversationModel.findOne({
-                "$or" : [
-                    { sender : user?._id, receiver : msgByUserId },
-                    { sender : msgByUserId, receiver :  user?._id}
-                ]
-            }).slice('messages', -30).populate({ path: 'messages', populate: { path: 'msgByUserId', select: 'name profile_pic' } }).sort({ updatedAt : -1 })
-
-            io.to(user?._id?.toString()).emit('message', { userId: msgByUserId, messages: getConversationMessage?.messages || [] })
-            io.to(msgByUserId).emit('message', { userId: user?._id?.toString(), messages: getConversationMessage?.messages || [] })
+            // Background sidebar update
+            setImmediate(async () => {
+                try {
+                    const [conversationSender, conversationReceiver] = await Promise.all([
+                        getConversation(user?._id?.toString()),
+                        getConversation(msgByUserId)
+                    ])
+                    io.to(user?._id?.toString()).emit('conversation', conversationSender)
+                    io.to(msgByUserId).emit('conversation', conversationReceiver)
+                } catch (err) {
+                    console.error('seen 1:1 background error:', err)
+                }
+            })
         }
     })
 
@@ -266,4 +301,3 @@ module.exports = {
     app,
     server
 }
-

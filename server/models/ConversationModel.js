@@ -72,7 +72,13 @@ const conversationSchema = new mongoose.Schema({
     timestamps : true
 })
 
-// MongoDB inherently indexes _id so no explicit index is needed
+// ── Performance indexes ────────────────────────────────────
+messageSchema.index({ msgByUserId: 1, createdAt: -1 })
+messageSchema.index({ seen: 1, msgByUserId: 1 })
+
+conversationSchema.index({ sender: 1, receiver: 1 })
+conversationSchema.index({ participants: 1, updatedAt: -1 })
+conversationSchema.index({ updatedAt: -1 })
 
 const MessageModel = mongoose.model('Message',messageSchema)
 const ConversationModel = mongoose.model('Conversation',conversationSchema)
